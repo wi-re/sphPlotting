@@ -99,7 +99,8 @@ def updatePlot(plotState,
             kernel = options.plottingKernel,
             alignment = 'center',
             includeFluid = options.fluidVisualization != VisualizeOptions.Hide,
-            includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide
+            includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide,
+            gridMode = options.gridVisualization.gridSupport
         )
 
         updateGridVisualize(plotState.gridResult, fig, axis, gridState, gridQuantity, nxs, gridExtent, options)
@@ -129,7 +130,8 @@ def updatePlot(plotState,
                 kernel = options.plottingKernel,
                 alignment = 'center',
                 includeFluid = options.fluidVisualization != VisualizeOptions.Hide,
-                includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide
+                includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide,
+                gridMode = options.gridVisualization.gridSupport
             )
 
             streamLines = updateStreamLinePlot(plotState.streamLines, fig, axis, streamLineGridState, streamLineGridQuantity, streamLinenxs, streamLineGridExtent, options)
@@ -144,6 +146,6 @@ def updatePlot(plotState,
 
     if options.plotTitle is not None:
         axis.set_title(options.plotTitle)
-        
+
     return plotState
 

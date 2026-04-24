@@ -125,6 +125,8 @@ def visualizeParticlesNew(
         ghostSc = scatterVisualize(fig, axis, ghostParticles, domain_, options, variant=VisualizeOptions.Hide)
         grid = None
         streamLines = None
+        gridState = None
+        gridQuantity = None
     else:
         gridState, gridQuantity, nxs, gridExtent = mapToGrid(
             particleState = particleState,
@@ -135,7 +137,8 @@ def visualizeParticlesNew(
             kernel = options.plottingKernel,
             alignment = 'center',
             includeFluid = options.fluidVisualization != VisualizeOptions.Hide,
-            includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide
+            includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide,
+            gridMode = options.gridVisualization.gridSupport
         )
 
         grid = gridVisualize(fig, axis, gridState, gridQuantity, nxs, gridExtent, options)
@@ -172,7 +175,8 @@ def visualizeParticlesNew(
                 kernel = options.plottingKernel,
                 alignment = 'center',
                 includeFluid = options.fluidVisualization != VisualizeOptions.Hide,
-                includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide
+                includeBoundary = options.boundaryVisualization != VisualizeOptions.Hide,
+                gridMode = options.gridVisualization.gridSupport
             )
             verbosePrint(verbose, 'Mapped streamline quantity to grid. Shape: ', streamLineGridQuantity.shape)
             verbosePrint(verbose, "Plotting streamlines...")

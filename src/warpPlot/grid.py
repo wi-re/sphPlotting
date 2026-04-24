@@ -65,6 +65,7 @@ def mapToGrid(
     alignment: str = 'center',
     includeFluid: bool = True,
     includeBoundary: bool = False,
+    gridMode: SupportScheme = SupportScheme.Scatter
 ):
     # Map particle quantities to a grid using SPH-like interpolation
     device = particleState.positions.device
@@ -91,7 +92,7 @@ def mapToGrid(
                 kernel = kernel,
                 operation = WarpOperation.Interpolate,
                 operationMode = OperationDirection.FluidToFluid,
-                supportMode = SupportScheme.Scatter
+                supportMode = gridMode
             ),
             domain = domain,
         )
@@ -103,7 +104,7 @@ def mapToGrid(
                 kernel = kernel,
                 operation = WarpOperation.Interpolate,
                 operationMode = OperationDirection.BoundaryToFluid,
-                supportMode = SupportScheme.Scatter
+                supportMode = gridMode
             ),
             domain = domain,
         )
