@@ -50,15 +50,21 @@ def updatePlot(plotState,
         streamLineQuantity = rotatedState.quantities.clone()
 
     # Apply the operation properties to the quantities if specified in the options
+
     if options.plottingOperation is not None:
-        rotatedState.quantities = warpOperation(
-            queryParticles = rotatedState,
-            queryValues = rotatedState.quantities,
-            operationProperties = options.plottingOperation,
-            adjacency = None, # We can consider adding adjacency-based operations in the future
-            domain = domain_
-        )
-        
+        if not isinstance(options.plottingOperation, list):
+            operationProperties = [options.plottingOperation]
+        else:
+            operationProperties = options.plottingOperation
+        for o, op in enumerate(operationProperties):
+            rotatedState.quantities = warpOperation(
+                queryParticles = rotatedState,
+                queryValues = rotatedState.quantities,
+                operationProperties = op,
+                adjacency = None, # We can consider adding adjacency-based operations in the future
+                domain = domain_
+            )
+            
     if options.gridVisualization is not None and options.gridVisualization.streamLines and options.gridVisualization.streamLineOperationLocation == StreamLineLocation.BeforeMapping:
         streamLineQuantity = rotatedState.quantities.clone()
 
@@ -136,5 +142,8 @@ def updatePlot(plotState,
     plotState.ghostParticles = ghostParticles
     plotState.assembledQuantity = assembledQuantity
 
+    if options.plotTitle is not None:
+        axis.set_title(options.plotTitle)
+        
     return plotState
 

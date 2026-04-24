@@ -23,6 +23,7 @@ dependencies = [
     "torch",
     "warp-lang",
     "numpy",
+    "sphWarpCore"
 ]
 
 [project.optional-dependencies]

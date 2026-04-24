@@ -18,6 +18,7 @@ from matplotlib.collections import PathCollection
 from matplotlib.colorbar import Colorbar
 from .util import verbosePrint
 from .state import VisualizationState, assembleQuantity
+import copy
 
 def visualizeParticlesNew(
     fig, axis,
@@ -26,7 +27,27 @@ def visualizeParticlesNew(
     quantity: torch.Tensor,
     options: PlottingOptions = PlottingOptions(),
     verbose = False,
+    **kwargs
 ):
+    """
+    High-level visualization orchestrator for SPH particle data.
+    
+    Pipeline: Domain Setup → Quantity Assembly → Rotation → 
+              Operation → Mapping → Filtering → Rendering
+    
+    Args:
+        quantity: Per-particle scalar or per-particle-type tuple of scalars
+        options: Controls all visualization aspects (see PlottingOptions)
+        
+    Returns:
+        VisualizationState with matplotlib artists and intermediate data
+        for use in animations/updates
+    """
+    options = copy.deepcopy(options)
+    for arg in kwargs:
+        if hasattr(options, arg):
+            setattr(options, arg, kwargs[arg])
+
     verbosePrint(verbose, "Processing domain and setting up axis...")
     domain_, rotMat, invRotMat = processDomain(fig, axis, domain, options, (particleState.masses / particleState.densities).mean().item())  
 
@@ -52,16 +73,21 @@ def visualizeParticlesNew(
 
     # Apply the operation properties to the quantities if specified in the options
     if options.plottingOperation is not None:
-        verbosePrint(verbose, "Applying plotting operation...")
-        verbosePrint(verbose, "Quantity shape before plotting operation: ", rotatedState.quantities.shape, 'min: ', torch.min(rotatedState.quantities).item(), 'max: ', torch.max(rotatedState.quantities).item())
-        rotatedState.quantities = warpOperation(
-            queryParticles = rotatedState,
-            queryValues = rotatedState.quantities,
-            operationProperties = options.plottingOperation,
-            adjacency = None, # We can consider adding adjacency-based operations in the future
-            domain = domain_
-        )
-        verbosePrint(verbose, "Plotting operation applied. New quantity shape: ", rotatedState.quantities.shape, 'min: ', torch.min(rotatedState.quantities).item(), 'max: ', torch.max(rotatedState.quantities).item())
+        if not isinstance(options.plottingOperation, list):
+            operationProperties = [options.plottingOperation]
+        else:
+            operationProperties = options.plottingOperation
+        for o, op in enumerate(operationProperties):
+            verbosePrint(verbose, f"Applying plotting operation {o}...")
+            verbosePrint(verbose, "Quantity shape before plotting operation: ", rotatedState.quantities.shape, 'min: ', torch.min(rotatedState.quantities).item(), 'max: ', torch.max(rotatedState.quantities).item())
+            rotatedState.quantities = warpOperation(
+                queryParticles = rotatedState,
+                queryValues = rotatedState.quantities,
+                operationProperties = op,
+                adjacency = None, # We can consider adding adjacency-based operations in the future
+                domain = domain_
+            )
+            verbosePrint(verbose, "Plotting operation applied. New quantity shape: ", rotatedState.quantities.shape, 'min: ', torch.min(rotatedState.quantities).item(), 'max: ', torch.max(rotatedState.quantities).item())
 
     if options.gridVisualization is not None and options.gridVisualization.streamLines and options.gridVisualization.streamLineOperationLocation == StreamLineLocation.BeforeMapping:
         streamLineQuantity = rotatedState.quantities.clone()
@@ -155,7 +181,8 @@ def visualizeParticlesNew(
         else:
             streamLines = None
 
-
+    if options.plotTitle is not None:
+        axis.set_title(options.plotTitle)
     verbosePrint(verbose, "Visualization setup complete.")
     return VisualizationState(
         fig = fig,
