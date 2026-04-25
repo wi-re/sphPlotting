@@ -3,6 +3,7 @@ from matplotlib.colorbar import Colorbar
 from matplotlib.streamplot import StreamplotSet
 from sphWarpCore import DomainDescription, ParticleState, volumeToSupport, warpOperation
 from sphWarpCore import OperationProperties, WarpOperation, OperationDirection, KernelFunctions, SupportScheme, ParticleType
+from warpPlot.update import updatePlot
 from .domain import processDomain
 from .grid import generateGrid, mapToGrid, gridVisualize
 from .scatter import scatterVisualize
@@ -205,3 +206,35 @@ def visualizeParticlesNew(
     )
 
 
+from typing import Union, Dict, Tuple, Optional, Any
+from .state import VisualizationState
+from sphWarpCore.radiusSearch import DomainDescription
+import matplotlib.pyplot as plt
+
+def visualize(
+    particleState: Any,
+    domain: DomainDescription,
+    quantities: Union[torch.Tensor, Dict[str, torch.Tensor]],
+    plotOptions: Union[torch.Tensor, Dict[str, torch.Tensor]],
+    mosaic: str = 'A',
+    figsize: Tuple[float, float] = (7,6),
+    sharex: bool = True,
+    sharey: bool = True,
+    figTitle: Optional[str] = None,
+):
+    fig, axis = plt.subplot_mosaic(mosaic, figsize=figsize, sharex=sharex, sharey=sharey)
+    plotStates = {}
+    for key in axis:
+        plotState = visualizeParticlesNew(
+            fig, axis[key],
+            particleState = particleState,
+            domain = domain,
+            quantity = quantities[key] if isinstance(quantities, dict) else quantities,
+            options = plotOptions[key] if isinstance(plotOptions, dict) else plotOptions,
+            plotTitle = f"Visualization of {key}",
+        )
+        plotStates[key] = plotState
+        if figTitle is not None:
+            fig.suptitle(figTitle, fontsize=16)
+    fig.tight_layout()
+    return fig, axis, plotStates

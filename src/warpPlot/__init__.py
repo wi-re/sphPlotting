@@ -1,8 +1,8 @@
 
 __version__ = "0.1.0"
 
-from .visualize import visualizeParticlesNew
-from .update import updatePlot
+from .visualize import visualizeParticlesNew, visualize
+from .update import updatePlot, updateVisualization
 
 from .enumTypes import VisualizeOptions, PlotScaling, Mapping, StreamLineLocation, ColorMap
 from .options import PlottingOptions, GridVisualization
@@ -19,5 +19,7 @@ __all__ = [
     "GridVisualization",
     "mapToGrid",
     "generateGrid",
-    "ColorMap"
+    "ColorMap",
+    "visualize",
+    "updateVisualization"
 ]
