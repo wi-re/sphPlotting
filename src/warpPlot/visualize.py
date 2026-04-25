@@ -210,6 +210,76 @@ from typing import Union, Dict, Tuple, Optional, Any
 from .state import VisualizationState
 from sphWarpCore.radiusSearch import DomainDescription
 import matplotlib.pyplot as plt
+from dataclasses import dataclass
+
+from typing import Union, Dict, Tuple, Optional, Any, List
+from warpPlot.state import VisualizationState
+from sphWarpCore.radiusSearch import DomainDescription
+import matplotlib.pyplot as plt
+from dataclasses import dataclass
+
+@dataclass
+class PlotState:
+    fig: plt.Figure
+    axes: Dict[str, plt.Axes]
+    domain: DomainDescription
+    options: PlottingOptions
+    quantities: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    particleState: Any
+    mosaic : str
+    sharex: bool
+    sharey: bool
+    figTitle: Optional[str]
+    
+    plotStates: Dict[str, VisualizationState]
+    
+    def updateTitle(self, newTitle: str):
+        self.fig.suptitle(newTitle, fontsize=16)
+        
+    def updateQuantities(self, newQuantities: Union[torch.Tensor, Dict[str, torch.Tensor]], key: Optional[str] = None, newParticleState: Optional[Any] = None, newDomain: Optional[DomainDescription] = None, newOptions: Optional[Dict[str, Any]] = None, **kwargs):
+        if newParticleState is not None:
+            self.particleState = newParticleState
+        if newDomain is not None:
+            self.domain = newDomain
+        if key is not None and isinstance(newQuantities, dict):
+            self.quantities[key] = newQuantities[key]
+            self.updatePlot(key, newOptions= newOptions[key] if newOptions is not None and key in newOptions else None, **kwargs)
+        elif key is not None and isinstance(newQuantities, torch.Tensor):
+            self.quantities[key] = newQuantities
+            self.updatePlot(key, newOptions= newOptions[key] if newOptions is not None and key in newOptions else None, **kwargs)
+        elif key is None and isinstance(self.quantities, dict) and isinstance(newQuantities, dict):
+            for k in newQuantities:
+                self.quantities[k] = newQuantities[k]
+                self.updatePlot(k, newOptions= newOptions[k] if newOptions is not None and k in newOptions else None, **kwargs)
+        else:
+            if len(self.plotStates) == 1:
+                self.quantities = newQuantities
+                self.updatePlot(list(self.plotStates.keys())[0], newOptions= newOptions[list(self.plotStates.keys())[0]] if newOptions is not None and list(self.plotStates.keys())[0] in newOptions else None, **kwargs)
+        
+            
+    def updatePlot(self, key: Union[str, List[str]], newOptions: Optional[Dict[str, Any]] = None, **kwargs):
+        if isinstance(key, list):
+            for k in key:
+                self.updatePlot(k, newOptions, **kwargs)
+            return
+
+        plotState = self.plotStates[key]
+        particleState = self.particleState
+        domain = self.domain
+        # options = plotState.options if newOptions is None else PlottingOptions(**{**plotState.options.__dict__, **newOptions})
+        quantity = self.quantities[key] if isinstance(self.quantities, dict) else self.quantities
+
+        updatedState = updatePlot(
+            plotState,
+            particles = particleState,
+            domain = domain,
+            quantity = quantity,
+            options = plotState.options,
+            **newOptions if newOptions is not None else {},
+            **kwargs
+        )
+        self.plotStates[key] = updatedState
+
 
 def visualize(
     particleState: Any,
@@ -237,4 +307,18 @@ def visualize(
         if figTitle is not None:
             fig.suptitle(figTitle, fontsize=16)
     fig.tight_layout()
-    return fig, axis, plotStates
+
+    return PlotState(
+        fig = fig,
+        axes = axis,
+        domain = domain,
+        options = plotOptions,
+        quantities = quantities,
+        mosaic = mosaic,
+        sharex = sharex,
+        sharey = sharey,
+        figTitle = figTitle,
+        plotStates = plotStates,
+        particleState=particleState,
+    )
+
