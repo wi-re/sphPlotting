@@ -206,32 +206,30 @@ def visualizeParticlesNew(
     )
 
 
-from typing import Union, Dict, Tuple, Optional, Any
+from typing import Union, Dict, Tuple, Optional, Any, List
 from .state import VisualizationState
 from sphWarpCore.radiusSearch import DomainDescription
 import matplotlib.pyplot as plt
-from dataclasses import dataclass
-
-from typing import Union, Dict, Tuple, Optional, Any, List
-from warpPlot.state import VisualizationState
-from sphWarpCore.radiusSearch import DomainDescription
-import matplotlib.pyplot as plt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class PlotState:
-    fig: plt.Figure
-    axes: Dict[str, plt.Axes]
+    fig: Any  # backend-specific figure handle (matplotlib Figure for default backend)
+    axes: Dict[str, Any]  # backend-specific per-panel handles
     domain: DomainDescription
     options: PlottingOptions
     quantities: Union[torch.Tensor, Dict[str, torch.Tensor]]
     particleState: Any
-    mosaic : str
+    mosaic: str
     sharex: bool
     sharey: bool
     figTitle: Optional[str]
-    
+
     plotStates: Dict[str, VisualizationState]
+
+    backend: str = "matplotlib"
+    backendOptions: Optional[dict] = None
+    _backend_instance: Any = field(default=None, repr=False, compare=False)
     
     def updateTitle(self, newTitle: str):
         self.fig.suptitle(newTitle, fontsize=16)
@@ -263,21 +261,33 @@ class PlotState:
                 self.updatePlot(k, newOptions, **kwargs)
             return
 
-        plotState = self.plotStates[key]
+        panel_state = self.plotStates[key]
         particleState = self.particleState
-        domain = self.domain
-        # options = plotState.options if newOptions is None else PlottingOptions(**{**plotState.options.__dict__, **newOptions})
         quantity = self.quantities[key] if isinstance(self.quantities, dict) else self.quantities
 
-        updatedState = updatePlot(
-            plotState,
-            particles = particleState,
-            domain = domain,
-            quantity = quantity,
-            options = plotState.options,
-            **newOptions if newOptions is not None else {},
-            **kwargs
-        )
+        if self._backend_instance is not None:
+            updatedState = self._backend_instance.update_panel(
+                key,
+                panel_state,
+                particleState=particleState,
+                domain=self.domain,
+                quantity=quantity,
+                options=panel_state.options,
+                **newOptions if newOptions is not None else {},
+                **kwargs
+            )
+        else:
+            # Fallback: direct matplotlib updatePlot (keeps backward-compat if
+            # PlotState was constructed without a backend instance).
+            updatedState = updatePlot(
+                panel_state,
+                particles=particleState,
+                domain=self.domain,
+                quantity=quantity,
+                options=panel_state.options,
+                **newOptions if newOptions is not None else {},
+                **kwargs
+            )
         self.plotStates[key] = updatedState
 
 
@@ -285,40 +295,64 @@ def visualize(
     particleState: Any,
     domain: DomainDescription,
     quantities: Union[torch.Tensor, Dict[str, torch.Tensor]],
-    plotOptions: Union[torch.Tensor, Dict[str, torch.Tensor]],
+    plotOptions: Union[PlottingOptions, Dict[str, PlottingOptions]],
     mosaic: str = 'A',
-    figsize: Tuple[float, float] = (7,6),
+    figsize: Tuple[float, float] = (7, 6),
     sharex: bool = True,
     sharey: bool = True,
     figTitle: Optional[str] = None,
-):
-    fig, axis = plt.subplot_mosaic(mosaic, figsize=figsize, sharex=sharex, sharey=sharey)
+    backend: str = "matplotlib",
+    backendOptions: Optional[dict] = None,
+) -> 'PlotState':
+    """Create a multi-panel SPH visualization.
+
+    Args:
+        backend: One of ``"matplotlib"`` (default), ``"pyvista"``, or
+            ``"vispy"``.  Pass the :class:`~warpPlot.Backend` enum or a plain
+            string — both work.
+        backendOptions: Optional dict of keyword arguments forwarded verbatim to
+            the chosen backend's ``create_figure`` call.
+    """
+    from .backends.factory import get_backend
+    be = get_backend(backend, backendOptions)
+
+    fig = be.create_figure(
+        mosaic=mosaic,
+        figsize=figsize,
+        sharex=sharex,
+        sharey=sharey,
+        figTitle=figTitle,
+        backendOptions=backendOptions,
+    )
+    axis = be.get_axes()
+
     plotStates = {}
     for key in axis:
-        plotState = visualizeParticlesNew(
-            fig, axis[key],
-            particleState = particleState,
-            domain = domain,
-            quantity = quantities[key] if isinstance(quantities, dict) else quantities,
-            options = plotOptions[key] if isinstance(plotOptions, dict) else plotOptions,
-            plotTitle = f"Visualization of {key}",
+        panel_state = be.render_panel(
+            key,
+            particleState=particleState,
+            domain=domain,
+            quantity=quantities[key] if isinstance(quantities, dict) else quantities,
+            options=plotOptions[key] if isinstance(plotOptions, dict) else plotOptions,
         )
-        plotStates[key] = plotState
-        if figTitle is not None:
-            fig.suptitle(figTitle, fontsize=16)
-    fig.tight_layout()
+        plotStates[key] = panel_state
+
+    be.show()
 
     return PlotState(
-        fig = fig,
-        axes = axis,
-        domain = domain,
-        options = plotOptions,
-        quantities = quantities,
-        mosaic = mosaic,
-        sharex = sharex,
-        sharey = sharey,
-        figTitle = figTitle,
-        plotStates = plotStates,
+        fig=fig,
+        axes=axis,
+        domain=domain,
+        options=plotOptions,
+        quantities=quantities,
+        mosaic=mosaic,
+        sharex=sharex,
+        sharey=sharey,
+        figTitle=figTitle,
+        plotStates=plotStates,
         particleState=particleState,
+        backend=str(backend),
+        backendOptions=backendOptions,
+        _backend_instance=be,
     )
 

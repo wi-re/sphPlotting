@@ -27,11 +27,48 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# ── Matplotlib (default) backend ────────────────────────────────────────
+plot-matplotlib = [
+    "matplotlib",
+    "ipympl",
+    "ipywidgets",
+]
+# kept for backward-compat; equivalent to plot-matplotlib
 notebooks = [
     "matplotlib",
     "ipympl",
     "ipywidgets",
 ]
+
+# ── PyVista / VTK backend ────────────────────────────────────────────────
+plot-pyvista = [
+    "pyvista",
+    "trame",         # optional but needed for trameview in notebooks
+]
+
+# ── Vispy / OpenGL backend ───────────────────────────────────────────────
+plot-vispy = [
+    "vispy",
+    "jupyter_rfb",   # optional inline support for notebooks
+]
+
+# ── Lightweight VTK file export (no pyvista/vispy required) ─────────────
+vtk-export = [
+    "pyevtk",
+]
+
+# ── Everything ───────────────────────────────────────────────────────────
+plot-all = [
+    "matplotlib",
+    "ipympl",
+    "ipywidgets",
+    "pyvista",
+    "trame",
+    "vispy",
+    "jupyter_rfb",
+    "pyevtk",
+]
+
 dev = [
     "pytest",
     "build",
