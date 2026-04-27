@@ -233,6 +233,24 @@ class PlotState:
     
     def updateTitle(self, newTitle: str):
         self.fig.suptitle(newTitle, fontsize=16)
+
+    def show(self) -> None:
+        """Display or re-display the figure.
+
+        For the matplotlib backend this is equivalent to calling
+        ``fig.tight_layout()`` and is typically a no-op after the initial
+        ``visualize()`` call.
+
+        For the pyvista *static* backend, this re-captures an offscreen
+        screenshot and displays it inline in the current Jupyter cell —
+        useful for showing the updated scene after
+        ``updateQuantities(...)``.
+
+        For pyvista *trame* and the pop-out window modes, the scene updates
+        are reflected live and this call is also a no-op.
+        """
+        if self._backend_instance is not None:
+            self._backend_instance.show()
         
     def updateQuantities(self, newQuantities: Union[torch.Tensor, Dict[str, torch.Tensor]], key: Optional[str] = None, newParticleState: Optional[Any] = None, newDomain: Optional[DomainDescription] = None, newOptions: Optional[Dict[str, Any]] = None, **kwargs):
         if newParticleState is not None:
@@ -253,8 +271,14 @@ class PlotState:
             if len(self.plotStates) == 1:
                 self.quantities = newQuantities
                 self.updatePlot(list(self.plotStates.keys())[0], newOptions= newOptions[list(self.plotStates.keys())[0]] if newOptions is not None and list(self.plotStates.keys())[0] in newOptions else None, **kwargs)
-        
-            
+
+        # Flush the display after all panels are updated.
+        # For pyvista-static this captures a new screenshot; for trame it
+        # calls render(); for matplotlib it calls tight_layout() (no-op).
+        if self._backend_instance is not None:
+            self._backend_instance.show()
+
+
     def updatePlot(self, key: Union[str, List[str]], newOptions: Optional[Dict[str, Any]] = None, **kwargs):
         if isinstance(key, list):
             for k in key:
