@@ -5,6 +5,10 @@ from .visualize import visualizeParticlesNew, visualize
 from .update import updatePlot, updateVisualization
 
 from .enumTypes import VisualizeOptions, PlotScaling, Mapping, StreamLineLocation, ColorMap, Backend
+
+from .colorMaps  import UniformColorMap, SequentialColorMap, Sequential2ColorMap, DivergingColorMap, CyclicColorMap, MiscellaneousColorMap
+
+
 from .options import PlottingOptions, GridVisualization
 from .grid import mapToGrid, generateGrid
 
@@ -23,4 +27,10 @@ __all__ = [
     "visualize",
     "updateVisualization",
     "Backend",
+    "UniformColorMap",
+    "SequentialColorMap",
+    "Sequential2ColorMap",
+    "DivergingColorMap",
+    "CyclicColorMap",
+    "MiscellaneousColorMap"
 ]

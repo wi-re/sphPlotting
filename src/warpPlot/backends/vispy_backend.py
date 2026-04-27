@@ -656,12 +656,12 @@ class VispyBackend(AbstractBackend):
             cb_range: Optional[Tuple[float, float]] = None
             cb_cmap = cmap
             if opts.gridVisualization is not None:
-                # Recompute range from the grid quantity if we have it
+                # Derive range from the grid quantity's norm so the colorbar
+                # always reflects the actual data limits, not the normalised
+                # [0, 1] interval.
                 if image_grid is not None:
-                    # We need the scalar range; re-derive from opts vMin/vMax
-                    # stored on opts (getBounds side-effects fill them)
-                    cb_range = (float(opts.vMin) if opts.vMin is not None else 0.0,
-                                float(opts.vMax) if opts.vMax is not None else 1.0)
+                    _, grid_norm = getBounds(gridQuantity, opts)
+                    cb_range = (float(grid_norm.vmin), float(grid_norm.vmax))
             elif (
                 opts.fluidVisualization not in (VisualizeOptions.Hide, VisualizeOptions.Passive)
                 and fluid.positions.shape[0] > 0
@@ -858,19 +858,22 @@ class VispyBackend(AbstractBackend):
             from vispy.color import Colormap as VispyColormap  # noqa: PLC0415
 
             new_range: Optional[Tuple[float, float]] = None
-            if opts.gridVisualization is None:
-                if (
-                    opts.fluidVisualization not in (VisualizeOptions.Hide, VisualizeOptions.Passive)
-                    and fluid.positions.shape[0] > 0
-                ):
-                    q, _ = getBounds(fluid.quantities, opts)
-                    new_range = (float(np.nanmin(q)), float(np.nanmax(q)))
-                elif (
-                    opts.boundaryVisualization not in (VisualizeOptions.Hide, VisualizeOptions.Passive)
-                    and boundary.positions.shape[0] > 0
-                ):
-                    q, _ = getBounds(boundary.quantities, opts)
-                    new_range = (float(np.nanmin(q)), float(np.nanmax(q)))
+            if opts.gridVisualization is not None:
+                # gridQuantity was computed in the grid update block above
+                _, grid_norm = getBounds(gridQuantity, opts)
+                new_range = (float(grid_norm.vmin), float(grid_norm.vmax))
+            elif (
+                opts.fluidVisualization not in (VisualizeOptions.Hide, VisualizeOptions.Passive)
+                and fluid.positions.shape[0] > 0
+            ):
+                _, fluid_norm = getBounds(fluid.quantities, opts)
+                new_range = (float(fluid_norm.vmin), float(fluid_norm.vmax))
+            elif (
+                opts.boundaryVisualization not in (VisualizeOptions.Hide, VisualizeOptions.Passive)
+                and boundary.positions.shape[0] > 0
+            ):
+                _, bnd_norm = getBounds(boundary.quantities, opts)
+                new_range = (float(bnd_norm.vmin), float(bnd_norm.vmax))
             if new_range is not None:
                 vmin, vmax = new_range
                 panel_state.colorbar.clim = (f"{vmin:.3g}", f"{vmax:.3g}")
