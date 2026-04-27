@@ -870,16 +870,29 @@ class VispyBackend(AbstractBackend):
     def show(self) -> None:
         """Flush / display the canvas.
 
-        ``"native"`` mode
-            Shows the canvas in a native OS window.  Subsequent calls are
-            no-ops; call ``canvas.update()`` (or ``updateQuantities``) to
-            refresh.
-        ``"notebook"`` mode
-            Attaches the canvas as an inline Jupyter widget via
-            ``IPython.display.display``.  The live widget reflects future
-            ``update_panel`` calls automatically.
+        First call
+            Shows the canvas (native OS window or inline Jupyter widget).
+        Subsequent calls
+            For ``"native"`` mode: pumps the app event loop so pending redraws
+            are processed immediately — required for live updates inside a
+            synchronous ``for`` loop.
+            For ``"notebook"`` mode: directly calls the jupyter_rfb draw
+            pipeline without asyncio scheduling, so frames are pushed
+            synchronously via ZMQ and appear in the widget mid-loop.
+            (``nest_asyncio`` is intentionally avoided: it is broken in
+            Python 3.13 due to tightened ``contextvars.Context.run``
+            re-entrancy guards.)
         """
         if self._shown:
+            # Subsequent call: flush pending redraws
+            self._canvas.update()
+            if self._jupyter_mode == "native":
+                try:
+                    self._canvas.app.process_events()
+                except Exception:
+                    pass
+            elif self._jupyter_mode == "notebook":
+                self._flush_notebook_frame()
             return
         self._canvas.show()
         if self._jupyter_mode == "notebook":
@@ -890,6 +903,34 @@ class VispyBackend(AbstractBackend):
             except Exception:
                 pass
         self._shown = True
+
+    def _flush_notebook_frame(self) -> None:
+        """Push the current frame to the notebook widget synchronously.
+
+        jupyter_rfb throttles rendering via a ``max_buffered_frames`` (= 2)
+        check: if more frames are *in-flight* (sent but not yet ACK-ed by the
+        browser) it skips drawing.  The browser can only ACK frames between
+        kernel messages, so inside a synchronous ``for`` loop every frame
+        after the second would be silently dropped.
+
+        We bypass the throttle by calling ``get_frame()`` and
+        ``_rfb_send_frame()`` directly and resetting ``_frame_feedback`` to
+        pretend all previous frames were acknowledged before each call.  The
+        render and ZMQ send are fully synchronous; no asyncio is involved.
+        """
+        try:
+            backend = self._canvas._backend
+            if not (hasattr(backend, "get_frame") and hasattr(backend, "_rfb_send_frame")):
+                return
+            # Pretend all in-flight frames were acknowledged so the throttle
+            # never blocks us.
+            backend._frame_feedback = {"index": backend._rfb_frame_index}
+            with backend._output_context:
+                array = backend.get_frame()
+                if array is not None:
+                    backend._rfb_send_frame(array)
+        except Exception:
+            pass
 
     # -------------------------------------------------------------------------
     # Capability flags
