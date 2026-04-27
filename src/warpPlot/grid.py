@@ -84,6 +84,12 @@ def mapToGrid(
     )
     gridQuantity = torch.zeros((grid.shape[0],) + quantity.shape[1:], device=device, dtype=dtype)
 
+    if gridMode is None:
+        if grid.shape[0] < particleState.positions.shape[0]:
+            gridMode = SupportScheme.Gather
+        else:
+            gridMode = SupportScheme.Scatter
+
     if includeFluid:
         gridQuantity += warpOperation(
             queryParticles = gridState, referenceParticles = particleState,
