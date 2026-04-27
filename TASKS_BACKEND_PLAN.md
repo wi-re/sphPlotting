@@ -121,30 +121,35 @@
 
 ---
 
-## Phase 4: Vispy Backend Implementation
+## Phase 4: Vispy Backend Implementation ✅ COMPLETE
 
 ### Tasks
 
-- Implement `VispyBackend`:
-  - Use scene canvas with subviews for mosaic panels.
-  - Render particles via `visuals.Markers`.
-  - Maintain GPU buffers for positions/colors and update in-place.
-- Colormap pipeline:
-  - Convert existing normalization + colormap outputs to RGBA arrays for vispy.
-- Notebook/pop-out mode:
-  - pop-out native window by default.
-  - optional inline with `jupyter_rfb` when installed.
-- Grid mode (first iteration):
-  - render mapped grid with image visual.
-- Streamlines:
-  - initial implementation optional; if deferred, define a clear TODO and capability flag.
+- [x] Implement `VispyBackend` (`src/warpPlot/backends/vispy_backend.py`):
+  - `SceneCanvas` + vispy `Grid` widget divides the canvas into per-panel `ViewBox`es.
+  - Particles rendered via `visuals.Markers` with per-particle RGBA arrays.
+  - In-place updates via `markers.set_data(...)` — no scene teardown.
+- [x] Colormap pipeline:
+  - `_scalars_to_rgba`: applies matplotlib norm (all norm types) → `_get_cmap` → RGBA float32.
+- [x] Notebook/pop-out mode:
+  - Default `"native"` (pop-out window) outside Jupyter.
+  - Default `"notebook"` (inline `jupyter_rfb` widget) inside Jupyter kernels.
+  - Graceful silent fallback to `"native"` when `jupyter_rfb` is not installed.
+- [x] Grid mode: `visuals.Image` visual with `STTransform` for world-coordinate placement.
+- [x] Streamlines: deferred — `supports_streamlines = False`, clear TODO in source.
 
 ### Acceptance Criteria
 
-- User can call:
-  - `visualize(..., backend="vispy")`
-- Updates are fast for particle color changes and position updates.
-- Missing optional inline dependency does not break pop-out mode.
+- [x] User can call `visualize(..., backend="vispy")`.
+- [x] Updates are fast for particle color changes and position updates.
+- [x] Missing optional inline dependency does not break pop-out mode.
+
+### Known Limitations (post-Phase-4 follow-up)
+
+- Streamlines not yet implemented.
+- No colour-bar widget (norm/cmap is correct; bar is cosmetic).
+- Axis tick-label widgets not wired.
+- `sharex`/`sharey` camera linking not yet implemented.
 
 ### Risks
 
