@@ -1,6 +1,6 @@
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 import torch
 from sphWarpCore import DomainDescription, ParticleState, ParticleType

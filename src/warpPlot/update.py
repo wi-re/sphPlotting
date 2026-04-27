@@ -149,3 +149,28 @@ def updatePlot(plotState,
 
     return plotState
 
+
+
+from typing import Union, Dict, Tuple, Optional, Any
+from .state import VisualizationState
+from sphWarpCore.radiusSearch import DomainDescription
+
+def updateVisualization(
+    plotStates: Dict[str, VisualizationState],
+    particleState: Any,
+    domain: DomainDescription,
+    quantities: Union[torch.Tensor, Dict[str, torch.Tensor]],
+    newOptions: Optional[Dict[str, Dict[str, Any]]],
+    **kwargs):
+    newStates = {}
+    for key, plotState in plotStates.items():
+        newState = updatePlot(
+            plotState,
+            particles = particleState,
+            domain = domain,
+            quantity = quantities[key] if isinstance(quantities, dict) else quantities,
+            **(newOptions[key] if newOptions is not None and key in newOptions else {}),
+            **kwargs
+        )
+        newStates[key] = newState
+    return newStates
