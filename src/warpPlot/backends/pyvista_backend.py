@@ -206,6 +206,24 @@ def _cmap_name(options: PlottingOptions) -> str:
     return options.colorMap.value + ("_r" if options.flipColorMap else "")
 
 
+def _point_size(options: PlottingOptions, default_size: float) -> float:
+    """Resolve per-panel point size with backend default fallback."""
+    if options.markerSize is None:
+        return float(default_size)
+    return float(options.markerSize)
+
+
+def _in_ipykernel() -> bool:
+    """Best-effort detection for notebook kernels (Jupyter/VS Code)."""
+    try:
+        from IPython import get_ipython  # noqa: PLC0415
+
+        ip = get_ipython()
+        return ip is not None and "IPKernelApp" in getattr(ip, "config", {})
+    except Exception:
+        return False
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Backend implementation
 # ─────────────────────────────────────────────────────────────────────────────
@@ -220,6 +238,7 @@ class PyVistaBackend(AbstractBackend):
         self._point_size: float = 8.0
         self._shown: bool = False
         self._display_handle: Any = None  # IPython display handle for in-place updates
+        self._trame_view: Any = None      # keep viewer alive across incremental updates
 
     # -------------------------------------------------------------------------
     # Figure management
@@ -237,10 +256,18 @@ class PyVistaBackend(AbstractBackend):
         import pyvista as pv  # noqa: PLC0415
 
         opts = backendOptions or {}
-        self._jupyter_backend = opts.get("jupyter_backend", "static")
+        requested_backend = opts.get("jupyter_backend", "static")
+        notebook_fallback = opts.get("notebook_fallback_backend", "trame")
+        # Native pop-out windows from notebook kernels are often unreliable
+        # (especially in VS Code). Fall back to a notebook-safe backend.
+        if requested_backend == "none" and _in_ipykernel():
+            self._jupyter_backend = notebook_fallback
+        else:
+            self._jupyter_backend = requested_backend
         self._point_size = float(opts.get("point_size", 8.0))
         self._shown = False
         self._display_handle = None  # reset so new figure gets its own output cell anchor
+        self._trame_view = None
         # Note: do NOT call pv.set_jupyter_backend() here — it’s a global
         # setting and interferes with other plotters.  We pass jupyter_backend
         # directly to plotter.show() instead.
@@ -344,6 +371,7 @@ class PyVistaBackend(AbstractBackend):
             )
 
         else:
+            point_size = _point_size(opts, self._point_size)
             # ── fluid point cloud ─────────────────────────────────────────────
             if opts.fluidVisualization != VisualizeOptions.Hide and fluid.positions.shape[0] > 0:
                 pts = _to_3d(fluid.positions)
@@ -353,7 +381,7 @@ class PyVistaBackend(AbstractBackend):
                     actor_fluid = self._plotter.add_mesh(
                         mesh_fluid,
                         style="points",
-                        point_size=self._point_size,
+                        point_size=point_size,
                         color="gray",
                         opacity=0.5,
                         name=f"fluid_{panel_key}",
@@ -365,7 +393,7 @@ class PyVistaBackend(AbstractBackend):
                     actor_fluid = self._plotter.add_mesh(
                         mesh_fluid,
                         style="points",
-                        point_size=self._point_size,
+                        point_size=point_size,
                         render_points_as_spheres=False,
                         scalars="quantity",
                         cmap=_cmap_name(opts),
@@ -384,7 +412,7 @@ class PyVistaBackend(AbstractBackend):
                     actor_boundary = self._plotter.add_mesh(
                         mesh_boundary,
                         style="points",
-                        point_size=self._point_size,
+                        point_size=point_size,
                         color="gray",
                         opacity=0.5,
                         name=f"boundary_{panel_key}",
@@ -396,7 +424,7 @@ class PyVistaBackend(AbstractBackend):
                     actor_boundary = self._plotter.add_mesh(
                         mesh_boundary,
                         style="points",
-                        point_size=self._point_size,
+                        point_size=point_size,
                         render_points_as_spheres=False,
                         scalars="quantity",
                         cmap=_cmap_name(opts),
@@ -505,80 +533,145 @@ class PyVistaBackend(AbstractBackend):
             mesh_grid, grid_range = _grid_to_image_data(
                 gridState, gridQuantity, nxs, gridExtent, opts
             )
-            # Passing name= replaces the existing actor in PyVista's renderer.
-            actor_grid = self._plotter.add_mesh(
-                mesh_grid,
-                scalars="quantity",
-                cmap=_cmap_name(opts),
-                clim=grid_range,
-                show_scalar_bar=opts.showColorBar,
-                scalar_bar_args={"title": panel_key},
-                name=f"grid_{panel_key}",
-            )
+            if panel_state.mesh_grid is not None and panel_state.actor_grid is not None:
+                # Fast path: keep actor alive and only update scalar field.
+                panel_state.mesh_grid.point_data["quantity"] = mesh_grid.point_data["quantity"]
+                mesh_grid = panel_state.mesh_grid
+                actor_grid = panel_state.actor_grid
+                try:
+                    actor_grid.mapper.scalar_range = grid_range
+                except Exception:
+                    pass
+            else:
+                # Slow path: initial create or after mode switch.
+                actor_grid = self._plotter.add_mesh(
+                    mesh_grid,
+                    scalars="quantity",
+                    cmap=_cmap_name(opts),
+                    clim=grid_range,
+                    show_scalar_bar=opts.showColorBar,
+                    scalar_bar_args={"title": panel_key},
+                    name=f"grid_{panel_key}",
+                )
 
         else:
-            # ── scatter update: replace actors via same name ──────────────────
+            point_size = _point_size(opts, self._point_size)
+            # ── scatter update: mutate existing meshes when possible ──────────
             if fluid.positions.shape[0] > 0:
                 pts = _to_3d(fluid.positions)
-                mesh_fluid = pv.PolyData(pts)
-
                 if opts.fluidVisualization == VisualizeOptions.Passive:
-                    actor_fluid = self._plotter.add_mesh(
-                        mesh_fluid,
-                        style="points",
-                        point_size=self._point_size,
-                        color="gray",
-                        opacity=0.5,
-                        name=f"fluid_{panel_key}",
-                    )
+                    if panel_state.mesh_fluid is not None and panel_state.actor_fluid is not None:
+                        mesh_fluid = panel_state.mesh_fluid
+                        actor_fluid = panel_state.actor_fluid
+                        mesh_fluid.points = pts
+                        try:
+                            actor_fluid.prop.point_size = point_size
+                        except Exception:
+                            pass
+                    else:
+                        mesh_fluid = pv.PolyData(pts)
+                        actor_fluid = self._plotter.add_mesh(
+                            mesh_fluid,
+                            style="points",
+                            point_size=point_size,
+                            color="gray",
+                            opacity=0.5,
+                            name=f"fluid_{panel_key}",
+                        )
                 elif opts.fluidVisualization != VisualizeOptions.Hide:
                     q, norm = getBounds(fluid.quantities, opts)
                     fluid_range = _scalar_range(q, norm)
-                    mesh_fluid["quantity"] = q
-                    actor_fluid = self._plotter.add_mesh(
-                        mesh_fluid,
-                        style="points",
-                        point_size=self._point_size,
-                        render_points_as_spheres=False,
-                        scalars="quantity",
-                        cmap=_cmap_name(opts),
-                        clim=fluid_range,
-                        show_scalar_bar=opts.showColorBar,
-                        scalar_bar_args={"title": panel_key},
-                        name=f"fluid_{panel_key}",
-                    )
+                    if panel_state.mesh_fluid is not None and panel_state.actor_fluid is not None:
+                        mesh_fluid = panel_state.mesh_fluid
+                        actor_fluid = panel_state.actor_fluid
+                        mesh_fluid.points = pts
+                        mesh_fluid.point_data["quantity"] = q
+                        try:
+                            actor_fluid.mapper.scalar_range = fluid_range
+                        except Exception:
+                            pass
+                        try:
+                            actor_fluid.prop.point_size = point_size
+                        except Exception:
+                            pass
+                    else:
+                        mesh_fluid = pv.PolyData(pts)
+                        mesh_fluid["quantity"] = q
+                        actor_fluid = self._plotter.add_mesh(
+                            mesh_fluid,
+                            style="points",
+                            point_size=point_size,
+                            render_points_as_spheres=False,
+                            scalars="quantity",
+                            cmap=_cmap_name(opts),
+                            clim=fluid_range,
+                            show_scalar_bar=opts.showColorBar,
+                            scalar_bar_args={"title": panel_key},
+                            name=f"fluid_{panel_key}",
+                        )
+                else:
+                    mesh_fluid = None
+                    actor_fluid = None
 
             if boundary.positions.shape[0] > 0:
                 pts = _to_3d(boundary.positions)
-                mesh_boundary = pv.PolyData(pts)
-
                 if opts.boundaryVisualization == VisualizeOptions.Passive:
-                    actor_boundary = self._plotter.add_mesh(
-                        mesh_boundary,
-                        style="points",
-                        point_size=self._point_size,
-                        color="gray",
-                        opacity=0.5,
-                        name=f"boundary_{panel_key}",
-                    )
+                    if panel_state.mesh_boundary is not None and panel_state.actor_boundary is not None:
+                        mesh_boundary = panel_state.mesh_boundary
+                        actor_boundary = panel_state.actor_boundary
+                        mesh_boundary.points = pts
+                        try:
+                            actor_boundary.prop.point_size = point_size
+                        except Exception:
+                            pass
+                    else:
+                        mesh_boundary = pv.PolyData(pts)
+                        actor_boundary = self._plotter.add_mesh(
+                            mesh_boundary,
+                            style="points",
+                            point_size=point_size,
+                            color="gray",
+                            opacity=0.5,
+                            name=f"boundary_{panel_key}",
+                        )
                 elif opts.boundaryVisualization != VisualizeOptions.Hide:
                     q, norm = getBounds(boundary.quantities, opts)
                     boundary_range = _scalar_range(q, norm)
-                    mesh_boundary["quantity"] = q
-                    actor_boundary = self._plotter.add_mesh(
-                        mesh_boundary,
-                        style="points",
-                        point_size=self._point_size,
-                        render_points_as_spheres=False,
-                        scalars="quantity",
-                        cmap=_cmap_name(opts),
-                        clim=boundary_range,
-                        show_scalar_bar=False,
-                        name=f"boundary_{panel_key}",
-                    )
+                    if panel_state.mesh_boundary is not None and panel_state.actor_boundary is not None:
+                        mesh_boundary = panel_state.mesh_boundary
+                        actor_boundary = panel_state.actor_boundary
+                        mesh_boundary.points = pts
+                        mesh_boundary.point_data["quantity"] = q
+                        try:
+                            actor_boundary.mapper.scalar_range = boundary_range
+                        except Exception:
+                            pass
+                        try:
+                            actor_boundary.prop.point_size = point_size
+                        except Exception:
+                            pass
+                    else:
+                        mesh_boundary = pv.PolyData(pts)
+                        mesh_boundary["quantity"] = q
+                        actor_boundary = self._plotter.add_mesh(
+                            mesh_boundary,
+                            style="points",
+                            point_size=point_size,
+                            render_points_as_spheres=False,
+                            scalars="quantity",
+                            cmap=_cmap_name(opts),
+                            clim=boundary_range,
+                            show_scalar_bar=False,
+                            name=f"boundary_{panel_key}",
+                        )
+                else:
+                    mesh_boundary = None
+                    actor_boundary = None
 
 
         panel_state.fluid_scalar_range = fluid_range
+        panel_state.mesh_fluid = mesh_fluid
+        panel_state.actor_fluid = actor_fluid
         panel_state.mesh_boundary = mesh_boundary
         panel_state.actor_boundary = actor_boundary
         panel_state.boundary_scalar_range = boundary_range
@@ -623,8 +716,11 @@ class PyVistaBackend(AbstractBackend):
             # On first call, create an IPython display handle tied to this
             # output cell.  On subsequent calls, call handle.update() so the
             # image is replaced in-place rather than appended as a new output.
-            self._plotter.render()
-            img = np.ascontiguousarray(self._plotter.screenshot(return_img=True))
+            try:
+                self._plotter.render()
+                img = np.ascontiguousarray(self._plotter.screenshot(return_img=True))
+            except KeyboardInterrupt:
+                return
             try:
                 from IPython.display import display, Image as IPImage  # noqa: PLC0415
                 import io, PIL.Image  # noqa: PLC0415
@@ -647,14 +743,33 @@ class PyVistaBackend(AbstractBackend):
             if not self._shown:
                 try:
                     pv.set_jupyter_backend("trame")
-                    self._plotter.show()
+                    # Keep the trame viewer open so subsequent updateQuantities
+                    # calls can push incremental frames into the same widget.
+                    self._trame_view = self._plotter.show(
+                        jupyter_backend="trame",
+                        auto_close=False,
+                    )
                     self._shown = True
                 except Exception:
                     # trame not installed; fall back to static screenshot.
                     self._jupyter_backend = "static"
                     self.show()
             else:
-                self._plotter.render()
+                # render() pushes scene changes into the active trame view.
+                try:
+                    self._plotter.render()
+                except KeyboardInterrupt:
+                    return
+
+                # If available, nudge the trame-side view to push a fresh
+                # frame immediately rather than waiting for notebook idle.
+                try:
+                    if self._trame_view is not None:
+                        updater = getattr(self._trame_view, "update", None)
+                        if callable(updater):
+                            updater()
+                except Exception:
+                    pass
         else:
             # Pop-out native window.
             # Pass jupyter_backend='none' directly to show() — this overrides

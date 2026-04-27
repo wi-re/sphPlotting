@@ -212,6 +212,50 @@ from sphWarpCore.radiusSearch import DomainDescription
 import matplotlib.pyplot as plt
 from dataclasses import dataclass, field
 import copy 
+import time
+
+
+def _yield_notebook_events(seconds: float = 0.0) -> None:
+    """Yield control to the notebook event loop from sync code.
+
+    This keeps widget-based backends (e.g. pyvista+trame) responsive inside
+    plain ``for`` loops without forcing users to write async notebook cells.
+    """
+    delay = max(float(seconds), 0.0)
+
+    try:
+        from IPython import get_ipython  # noqa: PLC0415
+
+        ip = get_ipython()
+        in_notebook = ip is not None and "IPKernelApp" in getattr(ip, "config", {})
+    except Exception:
+        in_notebook = False
+
+    if not in_notebook:
+        if delay > 0.0:
+            time.sleep(delay)
+        return
+
+    try:
+        import asyncio  # noqa: PLC0415
+
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            try:
+                import nest_asyncio  # noqa: PLC0415
+
+                nest_asyncio.apply(loop)
+                loop.run_until_complete(asyncio.sleep(delay))
+            except Exception:
+                # Last resort: pause briefly if we cannot re-enter the loop.
+                if delay > 0.0:
+                    time.sleep(delay)
+        else:
+            loop.run_until_complete(asyncio.sleep(delay))
+    except Exception:
+        if delay > 0.0:
+            time.sleep(delay)
+import asyncio
 @dataclass
 class PlotState:
     fig: Any  # backend-specific figure handle (matplotlib Figure for default backend)
@@ -230,6 +274,7 @@ class PlotState:
     backend: str = "matplotlib"
     backendOptions: Optional[dict] = None
     _backend_instance: Any = field(default=None, repr=False, compare=False)
+    _update_counter: int = field(default=0, repr=False, compare=False)
     
     def updateTitle(self, newTitle: str):
         self.fig.suptitle(newTitle, fontsize=16)
@@ -252,7 +297,7 @@ class PlotState:
         if self._backend_instance is not None:
             self._backend_instance.show()
         
-    def updateQuantities(self, newQuantities: Union[torch.Tensor, Dict[str, torch.Tensor]], key: Optional[str] = None, newParticleState: Optional[Any] = None, newDomain: Optional[DomainDescription] = None, newOptions: Optional[Dict[str, Any]] = None, **kwargs):
+    def updateQuantities(self, newQuantities: Union[torch.Tensor, Dict[str, torch.Tensor]], key: Optional[str] = None, newParticleState: Optional[Any] = None, newDomain: Optional[DomainDescription] = None, newOptions: Optional[Dict[str, Any]] = None, redraw: bool = True, redrawEvery: int = 1, yieldNotebookEvents: bool = False, yieldSeconds: float = 0.02, **kwargs):
         if newParticleState is not None:
             self.particleState = copy.deepcopy(newParticleState)
             
@@ -285,8 +330,14 @@ class PlotState:
         # Flush the display after all panels are updated.
         # For pyvista-static this captures a new screenshot; for trame it
         # calls render(); for matplotlib it calls tight_layout() (no-op).
-        if self._backend_instance is not None:
-            self._backend_instance.show()
+        if self._backend_instance is not None and redraw:
+            n = max(int(redrawEvery), 1)
+            self._update_counter += 1
+            if self._update_counter % n == 0:
+                self._backend_instance.show()
+
+        if yieldNotebookEvents or self.backend == 'pyvista':
+            _yield_notebook_events(yieldSeconds)
         # if self.backend == 'matplotlib':
         #     self.fig.canvas.draw()
         #     self.fig.canvas.flush_events()
@@ -384,6 +435,8 @@ def visualize(
         )
         plotStates[key] = panel_state
 
+    if backend == 'matplotlib':
+        fig.tight_layout()
     be.show()
 
     return PlotState(
