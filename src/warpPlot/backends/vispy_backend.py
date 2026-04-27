@@ -120,16 +120,36 @@ def _parse_mosaic(mosaic: str) -> Tuple[Tuple[int, int], Dict[str, Tuple[int, in
 def _suppress_vispy_init_warnings():
     """Suppress libEGL/DRI3 and DPI warnings emitted during vispy canvas creation.
 
-    The libEGL warnings are written directly to file descriptor 2 (bypassing
-    Python's ``sys.stderr``), so we redirect the OS-level fd while the canvas
-    is initialised.  ``sys.stderr`` is replaced simultaneously to also capture
-    the Python-level "could not determine DPI" message.
+    Two sources of noise are silenced:
+
+    1. **libEGL / DRI3** – written directly to OS file-descriptor 2 (bypassing
+       Python's ``sys.stderr``), so we redirect fd 2 at the OS level.
+    2. **"could not determine DPI"** – emitted via vispy's internal Python
+       logger (``vispy.util.logs.logger``), not to stderr.  On WSL and
+       headless Linux there is no X server, so ``xdpyinfo`` / ``xrandr``
+       both fail and vispy falls back to 96 DPI after logging the warning.
+       We silence it by temporarily raising the vispy logger's level to
+       ``ERROR`` for the duration of canvas creation.
     """
+    import logging as _logging  # noqa: PLC0415
+
+    # ── fd-2 redirect (libEGL) ───────────────────────────────────────────────
     devnull_fd = _os.open(_os.devnull, _os.O_WRONLY)
     saved_fd2 = _os.dup(2)
     _os.dup2(devnull_fd, 2)
     saved_stderr = _sys.stderr
     _sys.stderr = _io.StringIO()
+
+    # ── vispy logger (DPI warning) ───────────────────────────────────────────
+    try:
+        import vispy.util.logs as _vispy_logs  # noqa: PLC0415
+        _vispy_logger = _vispy_logs.logger
+        _saved_level = _vispy_logger.level
+        _vispy_logger.setLevel(_logging.ERROR)
+    except Exception:
+        _vispy_logger = None
+        _saved_level = None
+
     try:
         yield
     finally:
@@ -137,6 +157,8 @@ def _suppress_vispy_init_warnings():
         _os.close(devnull_fd)
         _os.close(saved_fd2)
         _sys.stderr = saved_stderr
+        if _vispy_logger is not None:
+            _vispy_logger.setLevel(_saved_level)
 
 
 def _get_cmap(name: str):
@@ -347,23 +369,19 @@ def _grid_to_rgba_image(
     normed = np.clip(normed, 0.0, 1.0)
     rgba_img = _get_cmap(cmap_name)(normed).astype(np.float32)  # (H, W, 4)
 
-    # Infer world-space origin and cell spacing from grid point positions.
-    # The grid uses ij-indexing so pts[ny * ix + iy, dim]:
-    #   dx = pts[ny, 0] - pts[0, 0]  (change in x for ix 0→1, same iy)
-    #   dy = pts[1,  1] - pts[0, 1]  (change in y for iy 0→1, same ix)
-    pts = gridState.positions.detach().cpu().numpy()
-    ox = float(pts[0, 0])
-    oy = float(pts[0, 1])
-    dx = (
-        float(pts[ny, 0] - pts[0, 0])
-        if nx > 1
-        else float(gridExtent["max"][0] - gridExtent["min"][0])
-    )
-    dy = (
-        float(pts[1, 1] - pts[0, 1])
-        if ny > 1
-        else float(gridExtent["max"][1] - gridExtent["min"][1])
-    )
+    # Use the domain extent (cell *edges*) as image origin and cell size.
+    # Grid points are cell *centers* (alignment='center'), so using pts[0] as
+    # the origin would shift the image by half a cell.  gridExtent always
+    # contains domain.min / domain.max which are the true edge coordinates.
+    mn = gridExtent["min"]
+    mx = gridExtent["max"]
+    if hasattr(mn, "cpu"):
+        mn = mn.cpu().numpy()
+        mx = mx.cpu().numpy()
+    ox = float(mn[0])
+    oy = float(mn[1])
+    dx = float((mx[0] - mn[0]) / nx)
+    dy = float((mx[1] - mn[1]) / ny)
 
     return rgba_img, (ox, oy, dx, dy)
 
@@ -902,6 +920,9 @@ class VispyBackend(AbstractBackend):
                 ip_display(self._canvas)
             except Exception:
                 pass
+            # Push the first frame synchronously so the widget shows content
+            # immediately rather than displaying an empty placeholder.
+            self._flush_notebook_frame()
         self._shown = True
 
     def _flush_notebook_frame(self) -> None:
@@ -917,11 +938,23 @@ class VispyBackend(AbstractBackend):
         ``_rfb_send_frame()`` directly and resetting ``_frame_feedback`` to
         pretend all previous frames were acknowledged before each call.  The
         render and ZMQ send are fully synchronous; no asyncio is involved.
+
+        On the very first call (before the browser has sent a resize event),
+        ``get_frame()`` would return ``None`` because ``_physical_size`` is
+        still ``(1, 1)``.  We pre-set it from ``self._canvas_size`` so the
+        first frame is rendered at the correct resolution immediately after
+        ``ip_display(canvas)`` is called.
         """
         try:
             backend = self._canvas._backend
             if not (hasattr(backend, "get_frame") and hasattr(backend, "_rfb_send_frame")):
                 return
+            # Pre-set physical size if the browser hasn't sent a resize yet.
+            if getattr(backend, "_physical_size", (1, 1))[0] <= 1:
+                px_w, px_h = self._canvas_size
+                backend._physical_size = (px_w, px_h)
+                if hasattr(backend, "_helper"):
+                    backend._helper.set_physical_size(px_w, px_h)
             # Pretend all in-flight frames were acknowledged so the throttle
             # never blocks us.
             backend._frame_feedback = {"index": backend._rfb_frame_index}
