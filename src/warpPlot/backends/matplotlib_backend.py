@@ -111,7 +111,9 @@ class MatplotlibBackend(AbstractBackend):
 
     def show(self) -> None:
         if self._fig is not None:
-            self._fig.tight_layout()
+            # self._fig.tight_layout()
+            self._fig.canvas.draw()
+            self._fig.canvas.flush_events()
 
     # ------------------------------------------------------------------
     # Capability flags

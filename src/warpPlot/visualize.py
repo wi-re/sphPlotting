@@ -211,7 +211,7 @@ from .state import VisualizationState
 from sphWarpCore.radiusSearch import DomainDescription
 import matplotlib.pyplot as plt
 from dataclasses import dataclass, field
-
+import copy 
 @dataclass
 class PlotState:
     fig: Any  # backend-specific figure handle (matplotlib Figure for default backend)
@@ -254,7 +254,17 @@ class PlotState:
         
     def updateQuantities(self, newQuantities: Union[torch.Tensor, Dict[str, torch.Tensor]], key: Optional[str] = None, newParticleState: Optional[Any] = None, newDomain: Optional[DomainDescription] = None, newOptions: Optional[Dict[str, Any]] = None, **kwargs):
         if newParticleState is not None:
-            self.particleState = newParticleState
+            self.particleState = copy.deepcopy(newParticleState)
+            
+            positions = self.particleState.positions
+            minD = self.domain.min.detach()
+            maxD = self.domain.max.detach()
+            periodicity = self.domain.periodic
+
+            pos = [(torch.remainder(positions[:, i] - minD[i], maxD[i] - minD[i]) + minD[i]) if periodicity[i] else positions[:,i] for i in range(self.domain.dim)]
+            self.particleState.positions = torch.stack(pos, dim = -1)
+            # modPos = torch.stack(pos, dim = -1).detach().cpu().numpy()
+
         if newDomain is not None:
             self.domain = newDomain
         if key is not None and isinstance(newQuantities, dict):
@@ -277,6 +287,9 @@ class PlotState:
         # calls render(); for matplotlib it calls tight_layout() (no-op).
         if self._backend_instance is not None:
             self._backend_instance.show()
+        # if self.backend == 'matplotlib':
+        #     self.fig.canvas.draw()
+        #     self.fig.canvas.flush_events()
 
 
     def updatePlot(self, key: Union[str, List[str]], newOptions: Optional[Dict[str, Any]] = None, **kwargs):
@@ -350,11 +363,21 @@ def visualize(
     )
     axis = be.get_axes()
 
+    visParticleState = copy.deepcopy(particleState)
+    
+    positions = particleState.positions
+    minD = domain.min.detach()
+    maxD = domain.max.detach()
+    periodicity = domain.periodic
+
+    pos = [(torch.remainder(positions[:, i] - minD[i], maxD[i] - minD[i]) + minD[i]) if periodicity[i] else positions[:,i] for i in range(domain.dim)]
+    visParticleState.positions = torch.stack(pos, dim = -1)
+
     plotStates = {}
     for key in axis:
         panel_state = be.render_panel(
             key,
-            particleState=particleState,
+            particleState=visParticleState,
             domain=domain,
             quantity=quantities[key] if isinstance(quantities, dict) else quantities,
             options=plotOptions[key] if isinstance(plotOptions, dict) else plotOptions,
@@ -374,7 +397,7 @@ def visualize(
         sharey=sharey,
         figTitle=figTitle,
         plotStates=plotStates,
-        particleState=particleState,
+        particleState=visParticleState,
         backend=str(backend),
         backendOptions=backendOptions,
         _backend_instance=be,
