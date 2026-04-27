@@ -11,8 +11,8 @@ from typing import List, Optional, Union
 class GridVisualization:
     resolution: int = 128 # Number of grid points along each dimension, the grid will be square in 2D and cubic in 3D
     streamLines: bool = False # Whether to visualize streamlines based on the quantity gradient
-    gridSupport: SupportScheme = SupportScheme.Scatter # The support scheme to use when mapping particle quantities to the grid for visualization. This can affect the appearance of the grid-based visualization, with different schemes providing different levels of smoothing or detail in the visualized quantity.'
-    
+    gridSupport: Optional[SupportScheme] = None # The support scheme to use when mapping particle quantities to the grid for visualization. This can affect the appearance of the grid-based visualization, with different schemes providing different levels of smoothing or detail in the visualized quantity.'
+
     streamLineOperation: Optional[WarpOperation] = None # If specified, the operation will be applied to the quantity before computing the streamlines, allowing visualization of derived quantities such as acceleration. The operation should be defined with the appropriate properties for the quantity being visualized (e.g., if visualizing acceleration, the operation should compute acceleration from positions and velocities).
     streamLineGradientMode: GradientScheme = GradientScheme.Difference # The scheme used to compute the gradient for the streamlines
     streamLineLaplaceMode: LaplacianScheme = LaplacianScheme.Brookshaw # The scheme used to compute the Laplacian for the streamlines
