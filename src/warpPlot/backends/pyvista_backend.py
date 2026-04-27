@@ -501,6 +501,12 @@ class PyVistaBackend(AbstractBackend):
             particleState, domain, quantity, options
         )
 
+        colormap_changed = (
+            panel_state.options.colorMap != opts.colorMap
+            or panel_state.options.flipColorMap != opts.flipColorMap
+            or panel_state.options.showColorBar != opts.showColorBar
+        )
+
         self._plotter.subplot(panel_state.row, panel_state.col)
 
         mesh_fluid = panel_state.mesh_fluid
@@ -542,6 +548,16 @@ class PyVistaBackend(AbstractBackend):
                     actor_grid.mapper.scalar_range = grid_range
                 except Exception:
                     pass
+                if colormap_changed:
+                    actor_grid = self._plotter.add_mesh(
+                        mesh_grid,
+                        scalars="quantity",
+                        cmap=_cmap_name(opts),
+                        clim=grid_range,
+                        show_scalar_bar=opts.showColorBar,
+                        scalar_bar_args={"title": panel_key},
+                        name=f"grid_{panel_key}",
+                    )
             else:
                 # Slow path: initial create or after mode switch.
                 actor_grid = self._plotter.add_mesh(
@@ -594,6 +610,19 @@ class PyVistaBackend(AbstractBackend):
                             actor_fluid.prop.point_size = point_size
                         except Exception:
                             pass
+                        if colormap_changed:
+                            actor_fluid = self._plotter.add_mesh(
+                                mesh_fluid,
+                                style="points",
+                                point_size=point_size,
+                                render_points_as_spheres=False,
+                                scalars="quantity",
+                                cmap=_cmap_name(opts),
+                                clim=fluid_range,
+                                show_scalar_bar=opts.showColorBar,
+                                scalar_bar_args={"title": panel_key},
+                                name=f"fluid_{panel_key}",
+                            )
                     else:
                         mesh_fluid = pv.PolyData(pts)
                         mesh_fluid["quantity"] = q
@@ -650,6 +679,18 @@ class PyVistaBackend(AbstractBackend):
                             actor_boundary.prop.point_size = point_size
                         except Exception:
                             pass
+                        if colormap_changed:
+                            actor_boundary = self._plotter.add_mesh(
+                                mesh_boundary,
+                                style="points",
+                                point_size=point_size,
+                                render_points_as_spheres=False,
+                                scalars="quantity",
+                                cmap=_cmap_name(opts),
+                                clim=boundary_range,
+                                show_scalar_bar=False,
+                                name=f"boundary_{panel_key}",
+                            )
                     else:
                         mesh_boundary = pv.PolyData(pts)
                         mesh_boundary["quantity"] = q
