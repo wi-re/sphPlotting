@@ -6,7 +6,7 @@ from .update import updatePlot, updateVisualization
 
 from .enumTypes import VisualizeOptions, PlotScaling, Mapping, StreamLineLocation, ColorMap, Backend
 
-from .colorMaps  import UniformColorMap, SequentialColorMap, Sequential2ColorMap, DivergingColorMap, CyclicColorMap, MiscellaneousColorMap
+from .colorMaps  import UniformColorMap, SequentialColorMap, Sequential2ColorMap, DivergingColorMap, CyclicColorMap, MiscellaneousColorMap, QualitativeColorMap
 
 
 from .options import PlottingOptions, GridVisualization
@@ -28,6 +28,7 @@ __all__ = [
     "updateVisualization",
     "Backend",
     "UniformColorMap",
+    "QualitativeColorMap",
     "SequentialColorMap",
     "Sequential2ColorMap",
     "DivergingColorMap",

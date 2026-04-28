@@ -729,6 +729,40 @@ class PyVistaBackend(AbstractBackend):
         return panel_state
 
     # -------------------------------------------------------------------------
+    # Export
+    # -------------------------------------------------------------------------
+
+    def export(self, filepath: str, **kwargs: Any) -> None:
+        """Export the scene to *filepath*.
+
+        The format is inferred from the file extension:
+
+        * **Raster** (``png``, ``jpg``, ``jpeg``, ``bmp``, ``tif``, ``tiff``):
+          uses :meth:`pyvista.Plotter.screenshot`.  Pass
+          ``transparent_background=True`` to get an alpha channel (PNG only).
+        * **Vector** (``svg``, ``eps``, ``ps``, ``pdf``):
+          uses :meth:`pyvista.Plotter.save_graphic`.
+
+        Note
+        ----
+        PyVista is a pixel-based renderer; ``dpi`` has no meaning here and is
+        silently ignored.  Use the ``window_size`` option when creating the
+        figure to control the output resolution instead.
+        """
+        if self._plotter is None:
+            raise RuntimeError("No plotter to export; call create_figure first.")
+        import os
+        ext = os.path.splitext(filepath)[1].lower().lstrip(".")
+        vector_exts = {"svg", "eps", "ps", "pdf"}
+        kwargs.pop("dpi", None)  # not meaningful for a pixel-based renderer
+        if ext in vector_exts:
+            allowed = {"title", "raster", "painter"}
+            self._plotter.save_graphic(filepath, **{k: v for k, v in kwargs.items() if k in allowed})
+        else:
+            allowed = {"window_size", "transparent_background", "return_img"}
+            self._plotter.screenshot(filepath, **{k: v for k, v in kwargs.items() if k in allowed})
+
+    # -------------------------------------------------------------------------
     # Display
     # -------------------------------------------------------------------------
 

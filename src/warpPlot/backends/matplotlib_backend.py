@@ -116,6 +116,22 @@ class MatplotlibBackend(AbstractBackend):
             self._fig.canvas.flush_events()
 
     # ------------------------------------------------------------------
+    # Export
+    # ------------------------------------------------------------------
+
+    def export(self, filepath: str, **kwargs: Any) -> None:
+        """Save the figure to *filepath*.
+
+        The format is inferred from the file extension (``png``, ``pdf``,
+        ``svg``, ``eps``, …).  All *kwargs* are forwarded verbatim to
+        :meth:`matplotlib.figure.Figure.savefig`, so ``dpi``,
+        ``transparent``, ``bbox_inches``, etc. are all supported.
+        """
+        if self._fig is None:
+            raise RuntimeError("No figure to export; call create_figure first.")
+        self._fig.savefig(filepath, **kwargs)
+
+    # ------------------------------------------------------------------
     # Capability flags
     # ------------------------------------------------------------------
 

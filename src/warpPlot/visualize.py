@@ -296,7 +296,38 @@ class PlotState:
         """
         if self._backend_instance is not None:
             self._backend_instance.show()
-        
+
+    def export(self, filepath: str, **kwargs) -> None:
+        """Export the current visualization to *filepath*.
+
+        The file format is inferred from the extension (e.g. ``".png"``,
+        ``".pdf"``, ``".svg"``).
+
+        Parameters
+        ----------
+        filepath:
+            Full path including extension.
+        dpi:
+            Dots per inch (supported by the matplotlib and vispy backends).
+        **kwargs:
+            Additional keyword arguments forwarded verbatim to the active
+            backend.  Common options:
+
+            * ``transparent`` / ``transparent_background`` — transparent
+              background (matplotlib / pyvista-raster).
+            * ``bbox_inches`` — e.g. ``"tight"`` (matplotlib only).
+
+        Raises
+        ------
+        NotImplementedError
+            If the active backend does not support file export.
+        RuntimeError
+            If no backend instance is available.
+        """
+        if self._backend_instance is None:
+            raise RuntimeError("No backend instance available.")
+        self._backend_instance.export(filepath, **kwargs)
+
     def updateQuantities(self, newQuantities: Union[torch.Tensor, Dict[str, torch.Tensor]], key: Optional[str] = None, newParticleState: Optional[Any] = None, newDomain: Optional[DomainDescription] = None, newOptions: Optional[Dict[str, Any]] = None, redraw: bool = True, redrawEvery: int = 1, yieldNotebookEvents: bool = False, yieldSeconds: float = 0.02, **kwargs):
         if newParticleState is not None:
             self.particleState = copy.deepcopy(newParticleState)

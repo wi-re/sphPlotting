@@ -885,6 +885,45 @@ class VispyBackend(AbstractBackend):
         return panel_state
 
     # -------------------------------------------------------------------------
+    # Export
+    # -------------------------------------------------------------------------
+
+    def export(self, filepath: str, **kwargs: Any) -> None:
+        """Export the canvas to *filepath*.
+
+        The canvas is rendered off-screen via :meth:`vispy.scene.SceneCanvas.render`
+        and written to *filepath* using PIL (Pillow).  Any raster format
+        supported by Pillow (``png``, ``jpg``, ``tiff``, …) is accepted.
+
+        Parameters
+        ----------
+        filepath:
+            Full path including extension.
+        dpi:
+            Dots per inch written into the image metadata (where supported by
+            the format, e.g. PNG/TIFF).  Has no effect on actual pixel
+            dimensions, which are determined by the canvas size.
+        **kwargs:
+            Remaining keyword arguments are forwarded to
+            :meth:`PIL.Image.Image.save`.
+        """
+        if self._canvas is None:
+            raise RuntimeError("No canvas to export; call create_figure first.")
+        img_array = self._canvas.render()
+        dpi = kwargs.pop("dpi", None)
+        try:
+            import PIL.Image  # noqa: PLC0415
+            img = PIL.Image.fromarray(img_array)
+            save_kwargs = dict(kwargs)
+            if dpi is not None:
+                save_kwargs.setdefault("dpi", (dpi, dpi))
+            img.save(filepath, **save_kwargs)
+        except ImportError:
+            # Pillow not available — fall back to vispy's built-in PNG writer
+            from vispy.io import write_png  # noqa: PLC0415
+            write_png(filepath, img_array)
+
+    # -------------------------------------------------------------------------
     # Display
     # -------------------------------------------------------------------------
 

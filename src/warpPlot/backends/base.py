@@ -103,10 +103,16 @@ class AbstractBackend(ABC):
     # Optional: file export
     # ------------------------------------------------------------------
 
-    def export(self, *args: Any, **kwargs: Any) -> None:
-        """Export the current scene to a file (optional).
+    def export(self, filepath: str, **kwargs: Any) -> None:
+        """Export the current scene to *filepath*.
 
-        Concrete backends that support export should override this method.
+        The file format is inferred from the extension of *filepath*
+        (e.g. ``".png"``, ``".pdf"``, ``".svg"``).  Keyword arguments are
+        forwarded to the underlying export call; common ones include ``dpi``
+        (matplotlib / vispy) and ``transparent`` (matplotlib).
+
+        Concrete backends that support export must override this method.
+        The base implementation always raises :exc:`NotImplementedError`.
         """
         raise NotImplementedError(
             f"The '{type(self).__name__}' backend does not support export."
