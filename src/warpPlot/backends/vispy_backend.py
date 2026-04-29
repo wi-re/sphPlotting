@@ -433,6 +433,9 @@ class VispyBackend(AbstractBackend):
         self._axes: Dict[str, Tuple[int, int]] = {}
         self._views: Dict[str, Any] = {}    # label → ViewBox (inside sub-grid col 0)
         self._jupyter_mode: str = "native"
+        self._app_backend: Optional[str] = None
+        self._window_pos: Optional[Tuple[int, int]] = None
+        self._force_primary_window: bool = False
         self._point_size: float = 10.0
         self._shown: bool = False
         self._canvas_size: Tuple[int, int] = (960, 480)  # (px_w, px_h)
@@ -451,6 +454,7 @@ class VispyBackend(AbstractBackend):
         figTitle: Optional[str],
         backendOptions: Optional[dict],
     ) -> Any:
+        import vispy.app as vapp  # noqa: PLC0415
         import vispy.scene as vs  # noqa: PLC0415
 
         opts = backendOptions or {}
@@ -463,6 +467,24 @@ class VispyBackend(AbstractBackend):
                 import jupyter_rfb  # noqa: F401
             except ImportError:
                 self._jupyter_mode = "native"
+
+        # In script/native mode we allow pinning the vispy app backend (e.g.
+        # PyQt5) to match standalone vispy examples and avoid backend-specific
+        # window mapping quirks.
+        self._app_backend = opts.get("app_backend", None)
+        if self._jupyter_mode == "native" and self._app_backend:
+            try:
+                vapp.use_app(self._app_backend)
+            except Exception:
+                # Keep vispy's default backend selection as a fallback.
+                pass
+
+        pos_opt = opts.get("window_pos", None)
+        if isinstance(pos_opt, (list, tuple)) and len(pos_opt) == 2:
+            self._window_pos = (int(pos_opt[0]), int(pos_opt[1]))
+        else:
+            self._window_pos = None
+        self._force_primary_window = bool(opts.get("force_primary_window", False))
 
         self._point_size = float(opts.get("point_size", 10.0))
         self._shown = False
@@ -948,6 +970,7 @@ class VispyBackend(AbstractBackend):
             self._canvas.update()
             if self._jupyter_mode == "native":
                 try:
+                    self._ensure_native_window_visible()
                     self._canvas.app.process_events()
                 except Exception:
                     pass
@@ -955,6 +978,14 @@ class VispyBackend(AbstractBackend):
                 self._flush_notebook_frame()
             return
         self._canvas.show()
+        if self._jupyter_mode == "native":
+            # Force the OS window to the foreground once so it reliably maps
+            # on-screen before entering long synchronous simulation loops.
+            self._ensure_native_window_visible()
+            try:
+                self._canvas.app.process_events()
+            except Exception:
+                pass
         if self._jupyter_mode == "notebook":
             try:
                 from IPython.display import display as ip_display  # noqa: PLC0415
@@ -966,6 +997,52 @@ class VispyBackend(AbstractBackend):
             # immediately rather than displaying an empty placeholder.
             self._flush_notebook_frame()
         self._shown = True
+
+    def _ensure_native_window_visible(self) -> None:
+        """Best-effort native widget raise/activate for GUI backends."""
+        try:
+            native = getattr(self._canvas, "native", None)
+            if native is None:
+                return
+
+            # Optional explicit placement used to avoid stale/off-screen window
+            # coordinates when monitor layouts change between runs.
+            if self._window_pos is not None and hasattr(native, "move"):
+                native.move(*self._window_pos)
+
+            # Safety net: move to the primary screen when requested, or when
+            # the current top-left corner is outside all known screen rects.
+            if hasattr(native, "geometry") and hasattr(native, "screen"):
+                try:
+                    from PyQt5.QtGui import QGuiApplication  # noqa: PLC0415
+                except Exception:
+                    QGuiApplication = None
+                if QGuiApplication is not None:
+                    g = native.geometry()
+                    x, y = int(g.x()), int(g.y())
+                    screens = QGuiApplication.screens() or []
+                    in_any_screen = False
+                    for s in screens:
+                        sg = s.geometry()
+                        if sg.x() <= x < (sg.x() + sg.width()) and sg.y() <= y < (sg.y() + sg.height()):
+                            in_any_screen = True
+                            break
+                    if self._force_primary_window or not in_any_screen:
+                        ps = QGuiApplication.primaryScreen()
+                        if ps is not None and hasattr(native, "move"):
+                            pg = ps.availableGeometry()
+                            native.move(int(pg.x()) + 40, int(pg.y()) + 40)
+
+            if hasattr(native, "show"):
+                native.show()
+            if hasattr(native, "raise_"):
+                native.raise_()
+            if hasattr(native, "activateWindow"):
+                native.activateWindow()
+            if hasattr(native, "repaint"):
+                native.repaint()
+        except Exception:
+            pass
 
     def _flush_notebook_frame(self) -> None:
         """Push the current frame to the notebook widget synchronously.
