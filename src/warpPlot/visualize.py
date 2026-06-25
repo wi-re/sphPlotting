@@ -118,10 +118,46 @@ def visualizeParticlesNew(
     if options.gridVisualization is None:
         verbosePrint(verbose, "Creating scatter visualizations for fluid, boundary, and ghost particles...")
         verbosePrint(verbose, f"Fluid particles: {fluidParticles.positions.shape[0]}, Boundary particles: {boundaryParticles.positions.shape[0]}, Ghost particles: {ghostParticles.positions.shape[0]}")
+        fluidVisualized = options.fluidVisualization == VisualizeOptions.Visualize and fluidParticles.positions.shape[0] > 0
+        boundaryVisualized = options.boundaryVisualization == VisualizeOptions.Visualize and boundaryParticles.positions.shape[0] > 0
+
+        fluidQs = None
+        boundaryQs = None
+        sharedNorm = None
+        if fluidVisualized and boundaryVisualized:
+            combinedQuantity = torch.cat((fluidParticles.quantities, boundaryParticles.quantities), dim=0)
+            combinedQs, sharedNorm = getBounds(combinedQuantity, options)
+            fluidCount = fluidParticles.quantities.shape[0]
+            fluidQs = combinedQs[:fluidCount]
+            boundaryQs = combinedQs[fluidCount:]
+
+        colorBarOnFluid = fluidVisualized
+        colorBarOnBoundary = (not fluidVisualized) and boundaryVisualized
+
         verbosePrint(verbose, "Plotting Fluid Particles...")
-        fluidSc = scatterVisualize(fig, axis, fluidParticles, domain_, options, variant=options.fluidVisualization)
+        fluidSc = scatterVisualize(
+            fig,
+            axis,
+            fluidParticles,
+            domain_,
+            options,
+            variant=options.fluidVisualization,
+            precomputedQs=fluidQs,
+            precomputedNorm=sharedNorm,
+            attachColorBar=colorBarOnFluid,
+        )
         verbosePrint(verbose, "Plotting Boundary Particles...")
-        boundarySc = scatterVisualize(fig, axis, boundaryParticles, domain_, options, variant=options.boundaryVisualization)
+        boundarySc = scatterVisualize(
+            fig,
+            axis,
+            boundaryParticles,
+            domain_,
+            options,
+            variant=options.boundaryVisualization,
+            precomputedQs=boundaryQs,
+            precomputedNorm=sharedNorm,
+            attachColorBar=colorBarOnBoundary,
+        )
         verbosePrint(verbose, "Plotting Ghost Particles...")
         ghostSc = scatterVisualize(fig, axis, ghostParticles, domain_, options, variant=VisualizeOptions.Hide)
         grid = None

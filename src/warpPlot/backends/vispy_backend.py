@@ -322,15 +322,55 @@ def _fit_camera_to_domain(view: Any, domain_, margin: float = 0.05) -> None:
     mx = domain_.max.cpu().numpy()
     dx = float(mx[0] - mn[0])
     dy = float(mx[1] - mn[1])
-    pad_x = dx * margin
-    pad_y = dy * margin
     if domain_.dim == 2:
-        view.camera.set_range(
-            x=(float(mn[0]) - pad_x, float(mx[0]) + pad_x),
-            y=(float(mn[1]) - pad_y, float(mx[1]) + pad_y),
-        )
+        # PanZoomCamera uses a 2-D transform matrix that becomes singular when
+        # either axis span is exactly zero. Guard collapsed/near-collapsed
+        # domains by enforcing a small minimum span around the axis center.
+        min_span = 1e-9
+        span_x = max(abs(dx), min_span)
+        span_y = max(abs(dy), min_span)
+
+        cx = 0.5 * (float(mn[0]) + float(mx[0]))
+        cy = 0.5 * (float(mn[1]) + float(mx[1]))
+
+        half_x = 0.5 * span_x * (1.0 + 2.0 * margin)
+        half_y = 0.5 * span_y * (1.0 + 2.0 * margin)
+
+        x0, x1 = cx - half_x, cx + half_x
+        y0, y1 = cy - half_y, cy + half_y
+
+        try:
+            view.camera.set_range(x=(x0, x1), y=(y0, y1))
+        except Exception:
+            # Final fallback keeps the camera valid even if upstream vispy
+            # rejects a particular range on first layout/resize pass.
+            eps = 0.5
+            view.camera.set_range(x=(cx - eps, cx + eps), y=(cy - eps, cy + eps))
     # For 3-D, allow vispy's default auto-fit; an explicit extent-based fit
     # is deferred as a Phase 4 follow-up.
+
+
+def _view_rect_is_degenerate(view: Any, eps: float = 1e-9) -> bool:
+    """Return True when a view has an invalid/near-zero layout rect."""
+    try:
+        rect = view.rect
+        if rect is None:
+            return True
+        return float(rect.width) <= eps or float(rect.height) <= eps
+    except Exception:
+        return True
+
+
+def _camera_rect_is_degenerate(view: Any, eps: float = 1e-12) -> bool:
+    """Return True when the attached camera rect has near-zero span."""
+    try:
+        cam = getattr(view, "camera", None)
+        rect = getattr(cam, "rect", None)
+        if rect is None:
+            return False
+        return abs(float(rect.width)) <= eps or abs(float(rect.height)) <= eps
+    except Exception:
+        return False
 
 
 def _grid_to_rgba_image(
@@ -397,6 +437,50 @@ def _image_transform(ox: float, oy: float, dx: float, dy: float):
     from vispy.visuals.transforms import STTransform  # noqa: PLC0415
 
     return STTransform(scale=(dx, dy), translate=(ox, oy))
+
+
+def _style_colorbar_tick_labels(colorbar_widget: Any) -> None:
+    """Apply custom tick styling for vispy ColorBarWidget.
+
+    For vertical colorbars (orientation right/left), rotate ticks to read
+    vertically and right-align the upper-limit tick so long labels remain
+    within the allocated colorbar column.
+    """
+    if colorbar_widget is None:
+        return
+    try:
+        cb = colorbar_widget._colorbar
+        ticks = cb._ticks
+        if cb.orientation in ("right", "left") and len(ticks) >= 2:
+            ticks[0].rotation = -90
+            ticks[1].rotation = -90
+
+            # Vispy recomputes tick positions during layout; choose the
+            # physically top tick by y-position and right-align it.
+            y0 = float(ticks[0].pos[1])
+            y1 = float(ticks[1].pos[1])
+            top_idx = 0 if y0 >= y1 else 1
+            ticks[top_idx].anchors = ("right", "middle")
+    except Exception:
+        # Styling is best-effort; skip if vispy internals differ.
+        pass
+
+
+def _install_colorbar_style_hook(colorbar_widget: Any) -> None:
+    """Install a post-resize hook so custom tick alignment persists."""
+    if colorbar_widget is None or getattr(colorbar_widget, "_warpplot_style_hook", False):
+        return
+    try:
+        original_on_resize = colorbar_widget.on_resize
+
+        def _on_resize_and_style(event):
+            original_on_resize(event)
+            _style_colorbar_tick_labels(colorbar_widget)
+
+        colorbar_widget.on_resize = _on_resize_and_style
+        colorbar_widget._warpplot_style_hook = True
+    except Exception:
+        pass
 
 
 def _in_ipykernel() -> bool:
@@ -702,7 +786,7 @@ class VispyBackend(AbstractBackend):
                 colorbar_widget = ColorBarWidget(
                     cmap=_mpl_to_vispy_cmap(cb_cmap),
                     orientation="right",
-                    label=panel_key,
+                    label="",
                     label_color="black",
                     clim=(f"{vmin:.3g}", f"{vmax:.3g}"),
                 )
@@ -711,12 +795,12 @@ class VispyBackend(AbstractBackend):
                 self._subgrids[panel_key].add_widget(colorbar_widget, row=0, col=1)
                 colorbar_widget.width_min = 65
                 colorbar_widget.width_max = 65
+                _install_colorbar_style_hook(colorbar_widget)
                 # Rotate tick labels so they read vertically (-90° CCW, same
                 # as the main colorbar label).  Horizontal numbers like
                 # "0.0123" are wider than the 65-px column; rotated they fit
                 # comfortably.
-                colorbar_widget._colorbar._ticks[0].rotation = -90
-                colorbar_widget._colorbar._ticks[1].rotation = -90
+                _style_colorbar_tick_labels(colorbar_widget)
 
         return VispyVisualizationState(
             canvas=self._canvas,
@@ -900,6 +984,7 @@ class VispyBackend(AbstractBackend):
                 vmin, vmax = new_range
                 panel_state.colorbar.clim = (f"{vmin:.3g}", f"{vmax:.3g}")
             panel_state.colorbar.cmap = _mpl_to_vispy_cmap(cmap)
+            _style_colorbar_tick_labels(panel_state.colorbar)
 
         # Trigger a canvas redraw so the updated data is displayed
         self._canvas.update()
@@ -1072,8 +1157,26 @@ class VispyBackend(AbstractBackend):
             if getattr(backend, "_physical_size", (1, 1))[0] <= 1:
                 px_w, px_h = self._canvas_size
                 backend._physical_size = (px_w, px_h)
+                # Keep logical and canvas sizes in sync so the first resize
+                # event does not use a degenerate 1x1 viewbox layout.
+                if hasattr(backend, "_logical_size"):
+                    backend._logical_size = (px_w, px_h)
+                if hasattr(self._canvas, "size"):
+                    self._canvas.size = (px_w, px_h)
                 if hasattr(backend, "_helper"):
                     backend._helper.set_physical_size(px_w, px_h)
+                if hasattr(backend, "_emit_resize_event"):
+                    backend._emit_resize_event()
+
+            # If any panel still has a zero-sized viewbox, defer this frame.
+            # A subsequent browser resize/layout event will provide valid
+            # geometry and normal drawing can proceed without singular matrices.
+            if any(
+                _view_rect_is_degenerate(v) or _camera_rect_is_degenerate(v)
+                for v in self._views.values()
+            ):
+                return
+
             # Pretend all in-flight frames were acknowledged so the throttle
             # never blocks us.
             backend._frame_feedback = {"index": backend._rfb_frame_index}

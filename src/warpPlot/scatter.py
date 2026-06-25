@@ -10,13 +10,17 @@ from typing import Optional, Tuple
 import matplotlib.colors as colors
 from matplotlib.collections import PathCollection
 from matplotlib.colorbar import Colorbar
+import numpy as np
 
 def scatterVisualize(
     fig, axis,
     particleState: PlottingParticleState,
     domain: DomainDescription,
     options: PlottingOptions,
-    variant: VisualizeOptions = VisualizeOptions.Visualize
+    variant: VisualizeOptions = VisualizeOptions.Visualize,
+    precomputedQs: Optional[np.ndarray] = None,
+    precomputedNorm: Optional[colors.Normalize] = None,
+    attachColorBar: Optional[bool] = None,
 ):
     
     if variant == VisualizeOptions.Hide:
@@ -36,12 +40,17 @@ def scatterVisualize(
     
     quantity = particleState.quantities
 
-    qs, norm = getBounds(quantity, options)
+    if precomputedQs is None or precomputedNorm is None:
+        qs, norm = getBounds(quantity, options)
+    else:
+        qs = precomputedQs
+        norm = precomputedNorm
 
     sc = axis.scatter(modPos[:,0], modPos[:,1], s = options.markerSize, c = qs, cmap = options.colorMap.value + ('_r' if options.flipColorMap else ''), norm = norm)
     cb = None
 
-    if options.showColorBar:
+    shouldAttachColorBar = options.showColorBar if attachColorBar is None else (options.showColorBar and attachColorBar)
+    if shouldAttachColorBar:
         cb = fig.colorbar(sc, ax=axis)
     
     return sc, cb, norm
@@ -55,7 +64,10 @@ def updateScatterVisualize(
     particleState: PlottingParticleState,
     domain: DomainDescription,
     options: PlottingOptions,
-    variant: VisualizeOptions = VisualizeOptions.Visualize        
+    variant: VisualizeOptions = VisualizeOptions.Visualize,
+    precomputedQs: Optional[np.ndarray] = None,
+    precomputedNorm: Optional[colors.Normalize] = None,
+    attachColorBar: Optional[bool] = None,
 ):
     
     if variant == VisualizeOptions.Hide:
@@ -70,17 +82,48 @@ def updateScatterVisualize(
     modPos = torch.stack(pos, dim = -1).detach().cpu().numpy()
 
     sc, cb, norm = priorResult if priorResult is not None else (None, None, None)
+    shouldAttachColorBar = options.showColorBar if attachColorBar is None else (options.showColorBar and attachColorBar)
+
+    if sc is None:
+        return scatterVisualize(
+            fig,
+            axis,
+            particleState,
+            domain,
+            options,
+            variant=variant,
+            precomputedQs=precomputedQs,
+            precomputedNorm=precomputedNorm,
+            attachColorBar=attachColorBar,
+        )
 
     if variant == VisualizeOptions.Passive:
+        if cb is not None:
+            cb.remove()
+            cb = None
         sc.set_offsets(modPos)
-        return
+        return sc, None, None
     
     quantity = particleState.quantities
 
-    qs, norm = getBounds(quantity, options)
+    if precomputedQs is None or precomputedNorm is None:
+        qs, norm = getBounds(quantity, options)
+    else:
+        qs = precomputedQs
+        norm = precomputedNorm
 
     sc.set_offsets(modPos)
     sc.set_array(qs)
     sc.set_norm(norm)
     sc.set_cmap(options.colorMap.value + ('_r' if options.flipColorMap else ''))
-    return
+
+    if not shouldAttachColorBar and cb is not None:
+        cb.remove()
+        cb = None
+    elif shouldAttachColorBar and cb is None:
+        cb = fig.colorbar(sc, ax=axis)
+
+    if cb is not None:
+        cb.update_normal(sc)
+
+    return sc, cb, norm

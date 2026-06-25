@@ -86,9 +86,55 @@ def updatePlot(plotState,
     ghostParticles = filterState(rotatedState, rotatedState.quantities, kind=ParticleType.Ghost)
 
     if options.gridVisualization is None:
-        updateScatterVisualize(plotState.fluidScatterResult, fig, axis, fluidParticles, domain_, options, variant=options.fluidVisualization)
-        updateScatterVisualize(plotState.boundaryScatterResult, fig, axis, boundaryParticles, domain_, options, variant=options.boundaryVisualization)
-        updateScatterVisualize(plotState.ghostScatterResult, fig, axis, ghostParticles, domain_, options, variant=VisualizeOptions.Hide)
+        fluidVisualized = options.fluidVisualization == VisualizeOptions.Visualize and fluidParticles.positions.shape[0] > 0
+        boundaryVisualized = options.boundaryVisualization == VisualizeOptions.Visualize and boundaryParticles.positions.shape[0] > 0
+
+        fluidQs = None
+        boundaryQs = None
+        sharedNorm = None
+        if fluidVisualized and boundaryVisualized:
+            combinedQuantity = torch.cat((fluidParticles.quantities, boundaryParticles.quantities), dim=0)
+            combinedQs, sharedNorm = getBounds(combinedQuantity, options)
+            fluidCount = fluidParticles.quantities.shape[0]
+            fluidQs = combinedQs[:fluidCount]
+            boundaryQs = combinedQs[fluidCount:]
+
+        colorBarOnFluid = fluidVisualized
+        colorBarOnBoundary = (not fluidVisualized) and boundaryVisualized
+
+        plotState.fluidScatterResult = updateScatterVisualize(
+            plotState.fluidScatterResult,
+            fig,
+            axis,
+            fluidParticles,
+            domain_,
+            options,
+            variant=options.fluidVisualization,
+            precomputedQs=fluidQs,
+            precomputedNorm=sharedNorm,
+            attachColorBar=colorBarOnFluid,
+        )
+        plotState.boundaryScatterResult = updateScatterVisualize(
+            plotState.boundaryScatterResult,
+            fig,
+            axis,
+            boundaryParticles,
+            domain_,
+            options,
+            variant=options.boundaryVisualization,
+            precomputedQs=boundaryQs,
+            precomputedNorm=sharedNorm,
+            attachColorBar=colorBarOnBoundary,
+        )
+        plotState.ghostScatterResult = updateScatterVisualize(
+            plotState.ghostScatterResult,
+            fig,
+            axis,
+            ghostParticles,
+            domain_,
+            options,
+            variant=VisualizeOptions.Hide,
+        )
     else:
         gridState, gridQuantity, nxs, gridExtent = mapToGrid(
             particleState = rotatedState,

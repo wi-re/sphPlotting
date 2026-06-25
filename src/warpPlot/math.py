@@ -36,8 +36,8 @@ def getBounds(values: torch.Tensor, options: PlottingOptions):
         if options.midPoint is not None:
             if isinstance(options.midPoint, str):
                 options.midPoint = np.median(q)
-            minScale = -np.max(np.abs(q - options.midPoint)) if options.vMin is None else options.vMin
-            maxScale = np.max(np.abs(q - options.midPoint)) if options.vMax is None else options.vMax
+            minScale = options.midPoint-np.max(np.abs(q - options.midPoint)) if options.vMin is None else options.vMin
+            maxScale = options.midPoint+np.max(np.abs(q - options.midPoint)) if options.vMax is None else options.vMax
         if options.quantityScaling == PlotScaling.SymmetricLog:
             minElement = np.min(np.abs(q)[np.abs(q)>0.0]) if np.sum(np.abs(q) > 0.0) > 0 else 1.0
             maxElement = np.max(np.abs(q)) if np.sum(np.abs(q) > 0.0) > 0 else 10.0
