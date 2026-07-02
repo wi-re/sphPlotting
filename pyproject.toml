@@ -22,8 +22,7 @@ classifiers = [
 dependencies = [
     "torch",
     "warp-lang",
-    "numpy",
-    "sphWarpCore"
+    "numpy"
 ]
 
 [project.optional-dependencies]
