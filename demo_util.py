@@ -41,7 +41,7 @@ from diffSPH.enums import Operation, SupportScheme, GradientMode, LaplacianMode
 from diffSPH.operations import SPHOperation
 from sphWarpCore.ops import sphOperation_warp
 from sphWarpCore.enumTypes import *
-from sphWarpCore.sph import computeSPHCovariance_warpBackend
+# from sphWarpCore.sph import computeSPHCovariance_warpBackend
 from diffSPH.math import pinv2x2
 from diffSPH.modules.renorm import computeCovarianceMatrices
 from diffSPH.operations import KernelCorrectionScheme

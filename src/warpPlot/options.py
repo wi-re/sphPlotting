@@ -46,3 +46,4 @@ class PlottingOptions:
 
     plotDomain: bool = True # Whether to plot the domain boundaries (e.g., as a box in 2D or a cube in 3D) for reference. This can help provide context for the particle positions and quantities being visualized, especially if the domain has non-periodic boundaries or if the particles are not filling the entire domain.
     plotTitle : Optional[str] = None # An optional title to display on the plot, which can be useful for identifying the quantity being visualized or for distinguishing between different plots when visualizing multiple quantities or time steps.
+    plotTitleGap: Optional[float] = None # Optional title spacing. For matplotlib this is title padding in points; for vispy this is a fraction of the domain height. If None, backend defaults are used.

@@ -100,6 +100,18 @@ class AbstractBackend(ABC):
         """
 
     # ------------------------------------------------------------------
+    # Optional: figure title updates
+    # ------------------------------------------------------------------
+
+    def update_figure_title(self, title: Optional[str]) -> None:
+        """Update the figure title in-place.
+
+        Backends that support runtime title edits should override this
+        method. The default implementation is a no-op.
+        """
+        _ = title
+
+    # ------------------------------------------------------------------
     # Optional: file export
     # ------------------------------------------------------------------
 

@@ -223,7 +223,10 @@ def visualizeParticlesNew(
             streamLines = None
 
     if options.plotTitle is not None:
-        axis.set_title(options.plotTitle)
+        if options.plotTitleGap is not None:
+            axis.set_title(options.plotTitle, pad=float(options.plotTitleGap))
+        else:
+            axis.set_title(options.plotTitle)
     verbosePrint(verbose, "Visualization setup complete.")
     return VisualizationState(
         fig = fig,
@@ -313,7 +316,14 @@ class PlotState:
     _update_counter: int = field(default=0, repr=False, compare=False)
     
     def updateTitle(self, newTitle: str):
-        self.fig.suptitle(newTitle, fontsize=16)
+        self.figTitle = newTitle
+        if self._backend_instance is not None:
+            self._backend_instance.update_figure_title(newTitle)
+            return
+
+        # Fallback for legacy PlotState objects created without a backend.
+        if hasattr(self.fig, "suptitle"):
+            self.fig.suptitle(newTitle, fontsize=16)
 
     def show(self) -> None:
         """Display or re-display the figure.

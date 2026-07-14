@@ -191,7 +191,10 @@ def updatePlot(plotState,
     plotState.assembledQuantity = assembledQuantity
 
     if options.plotTitle is not None:
-        axis.set_title(options.plotTitle)
+        if options.plotTitleGap is not None:
+            axis.set_title(options.plotTitle, pad=float(options.plotTitleGap))
+        else:
+            axis.set_title(options.plotTitle)
 
     return plotState
 

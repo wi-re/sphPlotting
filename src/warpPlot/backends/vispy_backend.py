@@ -443,8 +443,8 @@ def _style_colorbar_tick_labels(colorbar_widget: Any) -> None:
     """Apply custom tick styling for vispy ColorBarWidget.
 
     For vertical colorbars (orientation right/left), rotate ticks to read
-    vertically and right-align the upper-limit tick so long labels remain
-    within the allocated colorbar column.
+    vertically and mirror the anchors so the upper-limit tick is right-
+    aligned and the lower-limit tick is left-aligned.
     """
     if colorbar_widget is None:
         return
@@ -454,13 +454,34 @@ def _style_colorbar_tick_labels(colorbar_widget: Any) -> None:
         if cb.orientation in ("right", "left") and len(ticks) >= 2:
             ticks[0].rotation = -90
             ticks[1].rotation = -90
+            ticks[1].pos = (float(ticks[0].pos[0]), float(ticks[0].pos[1]))
 
-            # Vispy recomputes tick positions during layout; choose the
-            # physically top tick by y-position and right-align it.
+            # Vispy recomputes tick positions during layout; choose top/bottom
+            # by y-position and set mirrored horizontal anchors.
             y0 = float(ticks[0].pos[1])
             y1 = float(ticks[1].pos[1])
             top_idx = 0 if y0 >= y1 else 1
-            ticks[top_idx].anchors = ("right", "middle")
+            bottom_idx = 1 - top_idx
+
+            # Use vertical top/bottom anchors so rotated labels are nudged
+            # inward from the colorbar ends instead of straddling the limits.
+            # ticks[top_idx].anchors = ("right", "top")
+            # ticks[bottom_idx].anchors = ("left", "bottom")
+
+            # Anchors alone are not always sufficient in vispy; explicitly
+            # move labels inward by a few pixels for consistent placement.
+            # inward_px = 160.0
+            # top_pos = np.array(ticks[top_idx].pos, dtype=np.float32)
+            # bot_pos = np.array(ticks[bottom_idx].pos, dtype=np.float32)
+            # top_pos[1] -= inward_px
+            # bot_pos[1] += inward_px
+            # ticks[top_idx].pos = top_pos
+            # ticks[bottom_idx].pos = bot_pos
+
+            # Ensure the text visuals pick up the modified transforms.
+            # ticks[top_idx].update()
+            # ticks[bottom_idx].update()
+            cb.update()
     except Exception:
         # Styling is best-effort; skip if vispy internals differ.
         pass
@@ -516,6 +537,9 @@ class VispyBackend(AbstractBackend):
         self._subgrids: Dict[str, Any] = {}  # label → per-panel sub-Grid
         self._axes: Dict[str, Tuple[int, int]] = {}
         self._views: Dict[str, Any] = {}    # label → ViewBox (inside sub-grid col 0)
+        self._figure_title_widget: Any = None
+        self._figure_title_height_px: int = 36
+        self._figure_title: str = ""
         self._jupyter_mode: str = "native"
         self._app_backend: Optional[str] = None
         self._window_pos: Optional[Tuple[int, int]] = None
@@ -540,6 +564,7 @@ class VispyBackend(AbstractBackend):
     ) -> Any:
         import vispy.app as vapp  # noqa: PLC0415
         import vispy.scene as vs  # noqa: PLC0415
+        from vispy.scene.widgets import Label  # noqa: PLC0415
 
         opts = backendOptions or {}
 
@@ -572,6 +597,7 @@ class VispyBackend(AbstractBackend):
 
         self._point_size = float(opts.get("point_size", 10.0))
         self._shown = False
+        self._figure_title = figTitle or ""
 
         shape, label_to_pos = _parse_mosaic(mosaic)
         self._axes = label_to_pos
@@ -591,6 +617,22 @@ class VispyBackend(AbstractBackend):
             )
 
         self._grid_widget = self._canvas.central_widget.add_grid(spacing=2)
+
+        # Keep an explicit title row so figure titles are visible in native
+        # windows and notebook widgets (window-title text alone is not).
+        self._figure_title_widget = Label(self._figure_title, color="black")
+        self._figure_title_widget.height_min = 0
+        self._figure_title_widget.height_max = 0
+        self._grid_widget.add_widget(
+            self._figure_title_widget,
+            row=0,
+            col=0,
+            col_span=max(shape[1], 1),
+        )
+
+        # Apply title text + visibility/height and sync native window title.
+        self.update_figure_title(figTitle)
+
         self._views = {}
         self._subgrids = {}
         for label, (r, c) in label_to_pos.items():
@@ -598,7 +640,7 @@ class VispyBackend(AbstractBackend):
             # fully contained within the panel's allocated space.  Within the
             # sub-grid: col 0 = ViewBox, col 1 = ColorBarWidget slot (added
             # lazily in render_panel when showColorBar is True).
-            sg = self._grid_widget.add_grid(row=r, col=c, spacing=0)
+            sg = self._grid_widget.add_grid(row=r + 1, col=c, spacing=0)
             view = sg.add_view(row=0, col=0, bgcolor="white", border_color="gray")
             self._subgrids[label] = sg
             self._views[label] = view
@@ -657,7 +699,8 @@ class VispyBackend(AbstractBackend):
             mn = domain_.min.cpu().numpy()
             mx = domain_.max.cpu().numpy()
             cx = 0.5 * (float(mn[0]) + float(mx[0]))
-            pad = (float(mx[1]) - float(mn[1])) * 0.04
+            pad_frac = 0.04 if opts.plotTitleGap is None else float(opts.plotTitleGap)
+            pad = (float(mx[1]) - float(mn[1])) * pad_frac
             visuals.Text(
                 opts.plotTitle,
                 color="black",
@@ -788,7 +831,8 @@ class VispyBackend(AbstractBackend):
                     orientation="right",
                     label="",
                     label_color="black",
-                    clim=(f"{vmin:.3g}", f"{vmax:.3g}"),
+                    clim=(f"{vmin:.4g}", f"{vmax:.4g}"),
+                    # padding = (0.5,0)
                 )
                 # Add colorbar into the panel's sub-grid at col 1.
                 # Fix its width so the view (col 0) gets all remaining space.
@@ -801,6 +845,7 @@ class VispyBackend(AbstractBackend):
                 # "0.0123" are wider than the 65-px column; rotated they fit
                 # comfortably.
                 _style_colorbar_tick_labels(colorbar_widget)
+                colorbar_widget.update()
 
         return VispyVisualizationState(
             canvas=self._canvas,
@@ -1082,6 +1127,36 @@ class VispyBackend(AbstractBackend):
             # immediately rather than displaying an empty placeholder.
             self._flush_notebook_frame()
         self._shown = True
+
+    def update_figure_title(self, title: Optional[str]) -> None:
+        """Update figure title text for both canvas content and native window."""
+        text = "" if title is None else str(title)
+        self._figure_title = text
+
+        has_title = bool(text.strip())
+        if self._figure_title_widget is not None:
+            self._figure_title_widget.text = text
+            h = self._figure_title_height_px if has_title else 0
+            self._figure_title_widget.height_min = h
+            self._figure_title_widget.height_max = h
+
+        window_title = text if has_title else "warpPlot"
+        try:
+            self._canvas.title = window_title
+        except Exception:
+            pass
+
+        try:
+            native = getattr(self._canvas, "native", None)
+            if native is not None and hasattr(native, "setWindowTitle"):
+                native.setWindowTitle(window_title)
+        except Exception:
+            pass
+
+        if self._canvas is not None:
+            self._canvas.update()
+        if self._shown and self._jupyter_mode == "notebook":
+            self._flush_notebook_frame()
 
     def _ensure_native_window_visible(self) -> None:
         """Best-effort native widget raise/activate for GUI backends."""

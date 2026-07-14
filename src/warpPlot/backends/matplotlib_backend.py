@@ -115,6 +115,12 @@ class MatplotlibBackend(AbstractBackend):
             self._fig.canvas.draw()
             self._fig.canvas.flush_events()
 
+    def update_figure_title(self, title: Optional[str]) -> None:
+        if self._fig is None:
+            return
+        self._fig.suptitle("" if title is None else title, fontsize=16)
+        self._fig.canvas.draw_idle()
+
     # ------------------------------------------------------------------
     # Export
     # ------------------------------------------------------------------
