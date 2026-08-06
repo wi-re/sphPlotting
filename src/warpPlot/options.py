@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from .colorMaps import ColorMap
 from .enumTypes import VisualizeOptions, PlotScaling, Mapping, StreamLineLocation
-from sphWarpCore import GradientScheme, LaplacianScheme, OperationProperties, WarpOperation, OperationDirection, KernelFunctions, SupportScheme, ParticleType
+from sphWarpCore import *
 import torch
 from typing import List, Optional, Union
 

@@ -17,7 +17,7 @@ from typing import Any, Tuple
 
 import torch
 
-from sphWarpCore import DomainDescription, ParticleType, warpOperation
+from sphWarpCore import *
 
 from ..enumTypes import Mapping
 from ..math import buildRotationMatrix, mapQuantity

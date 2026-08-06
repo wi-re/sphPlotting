@@ -1,8 +1,7 @@
 from matplotlib.collections import PathCollection
 from matplotlib.colorbar import Colorbar
 from matplotlib.streamplot import StreamplotSet
-from sphWarpCore import DomainDescription, ParticleState, volumeToSupport, warpOperation
-from sphWarpCore import OperationProperties, WarpOperation, OperationDirection, KernelFunctions, SupportScheme, ParticleType
+from sphWarpCore import *
 from warpPlot.update import updatePlot
 from .domain import processDomain
 from .grid import generateGrid, mapToGrid, gridVisualize
@@ -247,7 +246,6 @@ def visualizeParticlesNew(
 
 from typing import Union, Dict, Tuple, Optional, Any, List
 from .state import VisualizationState
-from sphWarpCore.radiusSearch import DomainDescription
 import matplotlib.pyplot as plt
 from dataclasses import dataclass, field
 import copy 
