@@ -1031,6 +1031,29 @@ class VispyBackend(AbstractBackend):
             panel_state.colorbar.cmap = _mpl_to_vispy_cmap(cmap)
             _style_colorbar_tick_labels(panel_state.colorbar)
 
+        # -- update camera to fit new domain
+        _fit_camera_to_domain(view, domain_)
+        # -- update domain bounding box
+        if panel_state.domain_lines is not None and opts.plotDomain:
+            if domain_.dim == 2:
+                line_pts = _domain_line_positions_2d(domain_)
+                panel_state.domain_lines.set_data(line_pts)
+            else:
+                line_pts = _domain_line_positions_3d(domain_)
+                panel_state.domain_lines.set_data(line_pts)
+        # -- adjust panel title position if plotTitleGap changed or domain changed
+        if opts.plotTitle is not None:
+            mn = domain_.min.cpu().numpy()
+            mx = domain_.max.cpu().numpy()
+            cx = 0.5 * (float(mn[0]) + float(mx[0]))
+            pad_frac = 0.04 if opts.plotTitleGap is None else float(opts.plotTitleGap)
+            pad = (float(mx[1]) - float(mn[1])) * pad_frac
+            # Find the existing title text visual and update its position
+            for child in view.scene.children:
+                if isinstance(child, visuals.Text) and child.text == opts.plotTitle:
+                    child.pos = (cx, float(mx[1]) + pad, 0.0)
+                    break
+
         # Trigger a canvas redraw so the updated data is displayed
         self._canvas.update()
 
@@ -1157,6 +1180,50 @@ class VispyBackend(AbstractBackend):
             self._canvas.update()
         if self._shown and self._jupyter_mode == "notebook":
             self._flush_notebook_frame()
+
+    def update_domain(self, newDomain: Any) -> None:
+        """Update the domain for all panels.
+
+        This is a best-effort update: if the new domain is incompatible with
+        the existing particle states (e.g. different dimensionality), the
+        update is skipped and a warning is logged.
+        """
+        from ..math import getBounds  # noqa: PLC0415
+        import vispy.scene.visuals as visuals  # noqa: PLC0415
+
+        try:
+            for panel_key, view in self._views.items():
+                print(f"Updating domain for panel '{panel_key}' to {newDomain}")
+                # Get the current panel state to access its options and particles
+                panel_state = getattr(self, "_views", {}).get(panel_key, None)
+                if panel_state is None:
+                    print(f"Warning: No panel state found for '{panel_key}'; skipping domain update.")
+                    continue
+
+                # Check if the new domain is compatible with the existing particles
+                if newDomain.dim != panel_state.domain.dim:
+                    print(f"Warning: Incompatible domain dimension for panel '{panel_key}'; skipping domain update.")
+                    continue
+
+                # Update the domain in the panel state
+                panel_state.domain = newDomain
+                print(f"Updated domain for panel '{panel_key}' to {newDomain}")
+
+                # Recompute bounds and update camera
+                _fit_camera_to_domain(view, newDomain)
+
+                # Trigger a canvas redraw so the updated domain is displayed
+                self._canvas.update()
+                
+
+            # if newDomain.dim == 2:
+                
+            #     line_pts = _domain_line_positions_2d(newDomain)
+            #     self.domain_lines = visuals.Line(
+            #         line_pts, color="blue", connect="strip", parent=view.scene
+            #     )
+        except Exception:
+            pass
 
     def _ensure_native_window_visible(self) -> None:
         """Best-effort native widget raise/activate for GUI backends."""
