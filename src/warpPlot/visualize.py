@@ -323,6 +323,16 @@ class PlotState:
         if hasattr(self.fig, "suptitle"):
             self.fig.suptitle(newTitle, fontsize=16)
 
+    def updateDomain(self, newDomain: DomainDescription):
+        self.domain = newDomain
+        if self._backend_instance is not None:
+            self._backend_instance.update_domain(newDomain)
+            return
+
+        # # Fallback for legacy PlotState objects created without a backend.
+        # for key, panel_state in self.plotStates.items():
+        #     panel_state.domain = newDomain
+
     def show(self) -> None:
         """Display or re-display the figure.
 
@@ -373,8 +383,10 @@ class PlotState:
         self._backend_instance.export(filepath, **kwargs)
 
     def updateQuantities(self, newQuantities: Union[torch.Tensor, Dict[str, torch.Tensor]], key: Optional[str] = None, newParticleState: Optional[Any] = None, newDomain: Optional[DomainDescription] = None, newOptions: Optional[Dict[str, Any]] = None, redraw: bool = True, redrawEvery: int = 1, yieldNotebookEvents: bool = False, yieldSeconds: float = 0.02, **kwargs):
-        if newParticleState is not None:
-            self.particleState = copy.deepcopy(newParticleState)
+        if newDomain is not None:
+            self.domain = newDomain
+        if newParticleState is not None or newDomain is not None:
+            self.particleState = copy.deepcopy(newParticleState) if newParticleState is not None else self.particleState
             
             positions = self.particleState.positions
             minD = self.domain.min.detach()
@@ -385,8 +397,6 @@ class PlotState:
             self.particleState.positions = torch.stack(pos, dim = -1)
             # modPos = torch.stack(pos, dim = -1).detach().cpu().numpy()
 
-        if newDomain is not None:
-            self.domain = newDomain
         if key is not None and isinstance(newQuantities, dict):
             self.quantities[key] = newQuantities[key]
             self.updatePlot(key, newOptions= newOptions[key] if newOptions is not None and key in newOptions else None, **kwargs)
