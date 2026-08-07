@@ -1,8 +1,8 @@
 from matplotlib.collections import PathCollection
 from matplotlib.colorbar import Colorbar
 from matplotlib.streamplot import StreamplotSet
-from sphWarpCore import *
-from warpPlot.update import updatePlot
+from warpSPHCore import *
+from warpSPHPlotting.update import updatePlot
 from .domain import processDomain
 from .grid import generateGrid, mapToGrid, gridVisualize
 from .scatter import scatterVisualize
@@ -481,7 +481,7 @@ def visualize(
 
     Args:
         backend: One of ``"matplotlib"`` (default), ``"pyvista"``, or
-            ``"vispy"``.  Pass the :class:`~warpPlot.Backend` enum or a plain
+            ``"vispy"``.  Pass the :class:`~warpSPHPlotting.Backend` enum or a plain
             string — both work.
         backendOptions: Optional dict of keyword arguments forwarded verbatim to
             the chosen backend's ``create_figure`` call.

@@ -1,7 +1,7 @@
 from matplotlib.collections import PathCollection
 from matplotlib.colorbar import Colorbar
 from matplotlib.streamplot import StreamplotSet
-from sphWarpCore import *
+from warpSPHCore import *
 from .domain import processDomain
 from .grid import generateGrid, mapToGrid, updateGridVisualize
 from .scatter import updateScatterVisualize

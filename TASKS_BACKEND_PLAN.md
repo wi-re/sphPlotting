@@ -68,11 +68,11 @@
 ### Tasks
 
 - Create internal backend package:
-  - `src/warpPlot/backends/base.py`
-  - `src/warpPlot/backends/matplotlib_backend.py`
-  - `src/warpPlot/backends/pyvista_backend.py`
-  - `src/warpPlot/backends/vispy_backend.py`
-  - `src/warpPlot/backends/factory.py`
+  - `src/warpSPHPlotting/backends/base.py`
+  - `src/warpSPHPlotting/backends/matplotlib_backend.py`
+  - `src/warpSPHPlotting/backends/pyvista_backend.py`
+  - `src/warpSPHPlotting/backends/vispy_backend.py`
+  - `src/warpSPHPlotting/backends/factory.py`
 - Define backend interface methods:
   - `create_figure(mosaic, figsize, sharex, sharey, figTitle, backendOptions)`
   - `render_panel(panel_key, particleState, domain, quantity, options)`
@@ -125,7 +125,7 @@
 
 ### Tasks
 
-- [x] Implement `VispyBackend` (`src/warpPlot/backends/vispy_backend.py`):
+- [x] Implement `VispyBackend` (`src/warpSPHPlotting/backends/vispy_backend.py`):
   - `SceneCanvas` + vispy `Grid` widget divides the canvas into per-panel `ViewBox`es.
   - Particles rendered via `visuals.Markers` with per-particle RGBA arrays.
   - In-place updates via `markers.set_data(...)` — no scene teardown.
@@ -163,7 +163,7 @@
 ### Tasks
 
 - Add exporter module:
-  - `src/warpPlot/export/vtk_export.py`
+  - `src/warpSPHPlotting/export/vtk_export.py`
 - Implement functions:
   - `export_particles_vtp(path, particleState, quantities: dict, domain=None, metadata=None)`
   - `export_grid_vti(path, gridState, gridQuantity, resolution, extent, metadata=None)`
@@ -245,13 +245,13 @@
 ## Suggested File-Level Work Queue
 
 1. `pyproject.toml` extras and dependency guards.
-2. `src/warpPlot/backends/*` base, factory, matplotlib adapter.
-3. `src/warpPlot/visualize.py` backend parameter + dispatch.
-4. `src/warpPlot/update.py` backend-aware update dispatch.
-5. `src/warpPlot/state.py` backend-neutral state extensions.
-6. `src/warpPlot/backends/pyvista_backend.py` first implementation.
-7. `src/warpPlot/backends/vispy_backend.py` first implementation.
-8. `src/warpPlot/export/vtk_export.py` lightweight export path.
+2. `src/warpSPHPlotting/backends/*` base, factory, matplotlib adapter.
+3. `src/warpSPHPlotting/visualize.py` backend parameter + dispatch.
+4. `src/warpSPHPlotting/update.py` backend-aware update dispatch.
+5. `src/warpSPHPlotting/state.py` backend-neutral state extensions.
+6. `src/warpSPHPlotting/backends/pyvista_backend.py` first implementation.
+7. `src/warpSPHPlotting/backends/vispy_backend.py` first implementation.
+8. `src/warpSPHPlotting/export/vtk_export.py` lightweight export path.
 9. `README.md` docs + usage matrix.
 
 ---

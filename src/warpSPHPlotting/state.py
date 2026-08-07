@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 import torch
-from sphWarpCore import *
+from warpSPHCore import *
 from .options import PlottingOptions
 from matplotlib.collections import PathCollection
 from matplotlib.colorbar import Colorbar

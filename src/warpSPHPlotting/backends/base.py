@@ -1,4 +1,4 @@
-"""Abstract backend interface for warpPlot rendering.
+"""Abstract backend interface for warpSPHPlotting rendering.
 
 All concrete backends must subclass :class:`AbstractBackend` and implement
 every ``@abstractmethod``.  Optional capabilities are declared via the

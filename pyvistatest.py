@@ -20,12 +20,12 @@ wp.config.verify_autograd_array_access = False
 wp.config.verbose = False
 wp.init()
 
-from sphWarpCore import radiusSearchCompactHashMap, sphOperation_warp
-from sphWarpCore.enumTypes import *
+from warpSPHCore import radiusSearchCompactHashMap, sphOperation_warp
+from warpSPHCore.enumTypes import *
 
 import matplotlib.pyplot as plt
 from demo_util import *
-from warpPlot import *
+from warpSPHPlotting import *
 
 device = torch.device('cpu')
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -134,7 +134,7 @@ if not warpOnly:
         positiveDivergence=False
     )
 
-from warpPlot import *
+from warpSPHPlotting import *
 
 plotter = visualize(
     particleState = particleState,

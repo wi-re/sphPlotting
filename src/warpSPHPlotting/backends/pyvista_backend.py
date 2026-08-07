@@ -8,12 +8,12 @@ the full scene.
 Notebook display modes (pass via ``backendOptions={'jupyter_backend': ...}``):
   ``"static"``  — default; renders off-screen and shows a PNG snapshot inline.
   ``"trame"``   — interactive widget (requires ``trame``; install with
-                  ``pip install 'sphWarpPlotting[plot-pyvista]'``).
+                  ``pip install 'warpSPHPlotting[plot-pyvista]'``).
   ``"none"``    — pop-out native window (good for desktop use).
 
 Update pattern
 --------------
-After the initial :func:`~warpPlot.visualize.visualize` call, changes are
+After the initial :func:`~warpSPHPlotting.visualize.visualize` call, changes are
 pushed via ``plotState.updateQuantities(...)`` which calls
 :meth:`PyVistaBackend.update_panel` → ``mesh.points`` / ``mesh.point_data``
 mutation + ``plotter.render()``.
@@ -283,7 +283,7 @@ class PyVistaBackend(AbstractBackend):
             shape=shape,
             window_size=[int(figsize[0] * 96), int(figsize[1] * 96)],
             off_screen=off_screen,
-            title=figTitle or "warpPlot",
+            title=figTitle or "warpSPHPlotting",
         )
         return self._plotter
 

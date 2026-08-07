@@ -1,4 +1,4 @@
-from sphWarpCore import *
+from warpSPHCore import *
 import torch
 from .math import getBounds
 

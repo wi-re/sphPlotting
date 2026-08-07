@@ -5,8 +5,8 @@ backend takes over: domain copy, rotation matrix computation, quantity
 assembly, optional warp operations, mapping, shape validation, and
 per-particle-type filtering.
 
-Both :class:`~warpPlot.backends.matplotlib_backend.MatplotlibBackend` and
-:class:`~warpPlot.backends.pyvista_backend.PyVistaBackend` (and future
+Both :class:`~warpSPHPlotting.backends.matplotlib_backend.MatplotlibBackend` and
+:class:`~warpSPHPlotting.backends.pyvista_backend.PyVistaBackend` (and future
 backends) call :func:`prepare_particle_states` so that the business logic
 for "transform raw particle data into per-type scalar arrays" lives in
 exactly one place.
@@ -17,7 +17,7 @@ from typing import Any, Tuple
 
 import torch
 
-from sphWarpCore import *
+from warpSPHCore import *
 
 from ..enumTypes import Mapping
 from ..math import buildRotationMatrix, mapQuantity
@@ -49,7 +49,7 @@ def prepare_particle_states(
     Parameters
     ----------
     particleState:
-        Raw particle state (``sphWarpCore.ParticleState`` or duck-typed).
+        Raw particle state (``warpSPHCore.ParticleState`` or duck-typed).
     domain:
         Simulation domain description.
     quantity:

@@ -18,7 +18,7 @@ Display modes (``backendOptions={'jupyter_backend': ...}``)
 
 Update pattern
 --------------
-After the initial :func:`~warpPlot.visualize.visualize` call, call
+After the initial :func:`~warpSPHPlotting.visualize.visualize` call, call
 ``plotState.updateQuantities(...)`` which dispatches to
 :meth:`VispyBackend.update_panel`.  Existing ``Markers`` visuals are updated
 in-place via ``set_data`` — no scene teardown — so position and colour
@@ -489,7 +489,7 @@ def _style_colorbar_tick_labels(colorbar_widget: Any) -> None:
 
 def _install_colorbar_style_hook(colorbar_widget: Any) -> None:
     """Install a post-resize hook so custom tick alignment persists."""
-    if colorbar_widget is None or getattr(colorbar_widget, "_warpplot_style_hook", False):
+    if colorbar_widget is None or getattr(colorbar_widget, "_warpSPHPlotting_style_hook", False):
         return
     try:
         original_on_resize = colorbar_widget.on_resize
@@ -499,7 +499,7 @@ def _install_colorbar_style_hook(colorbar_widget: Any) -> None:
             _style_colorbar_tick_labels(colorbar_widget)
 
         colorbar_widget.on_resize = _on_resize_and_style
-        colorbar_widget._warpplot_style_hook = True
+        colorbar_widget._warpSPHPlotting_style_hook = True
     except Exception:
         pass
 
@@ -609,7 +609,7 @@ class VispyBackend(AbstractBackend):
 
         with _suppress_vispy_init_warnings():
             self._canvas = vs.SceneCanvas(
-                title=figTitle or "warpPlot",
+                title=figTitle or "warpSPHPlotting",
                 size=(px_w, px_h),
                 keys="interactive",
                 show=False,
@@ -1163,7 +1163,7 @@ class VispyBackend(AbstractBackend):
             self._figure_title_widget.height_min = h
             self._figure_title_widget.height_max = h
 
-        window_title = text if has_title else "warpPlot"
+        window_title = text if has_title else "warpSPHPlotting"
         try:
             self._canvas.title = window_title
         except Exception:

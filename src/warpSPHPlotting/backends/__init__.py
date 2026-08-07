@@ -1,8 +1,8 @@
-"""Backend plug-in package for warpPlot.
+"""Backend plug-in package for warpSPHPlotting.
 
 Importing this package does NOT import any heavy optional dependencies
 (pyvista, vispy, etc.).  Each backend module is loaded lazily by
-:mod:`warpPlot.backends.factory` only when the user actually requests it.
+:mod:`warpSPHPlotting.backends.factory` only when the user actually requests it.
 """
 
 from .base import AbstractBackend

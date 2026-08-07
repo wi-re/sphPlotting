@@ -1,7 +1,7 @@
 
 
 from matplotlib import patches
-from sphWarpCore import DomainDescription
+from warpSPHCore import DomainDescription
 from .options import PlottingOptions
 from .math import buildRotationMatrix
 from .scatter_util import computeMarkerSize

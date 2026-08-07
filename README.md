@@ -1,6 +1,6 @@
-# sphWarpPlotting
+# warpSPHPlotting
 
-`sphWarpPlotting` is a visualization layer for SPH particle data built on top of `sphWarpCore`.
+`warpSPHPlotting` is a visualization layer for SPH particle data built on top of `warpSPHCore`.
 It is designed to make SPH field inspection easy while keeping plotting configurable and update-friendly.
 
 The library centers around two functions:
@@ -36,7 +36,7 @@ pip install -e .[notebooks]
 ## Core API
 
 ```python
-from warpPlot import (
+from warpSPHPlotting import (
     visualizeParticlesNew,
     updatePlot,
     PlottingOptions,
@@ -50,8 +50,8 @@ from warpPlot import (
 
 ### Main Inputs
 
-- `particleState`: `sphWarpCore.ParticleState`
-- `domain`: `sphWarpCore.DomainDescription`
+- `particleState`: `warpSPHCore.ParticleState`
+- `domain`: `warpSPHCore.DomainDescription`
 - `quantity`: tensor to visualize (scalar or vector; can be mapped)
 - `options`: `PlottingOptions(...)` for rendering and operation behavior
 
@@ -63,7 +63,7 @@ from warpPlot import (
 
 ```python
 import matplotlib.pyplot as plt
-from warpPlot import visualizeParticlesNew, PlottingOptions, ColorMap
+from warpSPHPlotting import visualizeParticlesNew, PlottingOptions, ColorMap
 
 fig, ax = plt.subplots(1, 1, figsize=(6, 5))
 
@@ -86,7 +86,7 @@ fig.tight_layout()
 ## Stateful Update Example
 
 ```python
-from warpPlot import updatePlot, ColorMap
+from warpSPHPlotting import updatePlot, ColorMap
 
 updatePlot(
     state,

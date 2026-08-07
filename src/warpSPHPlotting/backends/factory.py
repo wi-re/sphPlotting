@@ -1,13 +1,13 @@
-"""Backend factory for warpPlot.
+"""Backend factory for warpSPHPlotting.
 
-Call :func:`get_backend` with a backend name (or :class:`~warpPlot.Backend`
+Call :func:`get_backend` with a backend name (or :class:`~warpSPHPlotting.Backend`
 enum member) to receive a fully initialised backend instance ready for use
-by :func:`~warpPlot.visualize`.
+by :func:`~warpSPHPlotting.visualize`.
 
 Adding a new backend
 --------------------
-1. Create ``src/warpPlot/backends/<name>_backend.py`` subclassing
-   :class:`~warpPlot.backends.base.AbstractBackend`.
+1. Create ``src/warpSPHPlotting/backends/<name>_backend.py`` subclassing
+   :class:`~warpSPHPlotting.backends.base.AbstractBackend`.
 2. Add a branch in :func:`get_backend` below.
 3. Add the corresponding extras entry in ``pyproject.toml``.
 """
@@ -31,7 +31,7 @@ def get_backend(backend: str, backendOptions: Optional[dict] = None) -> Abstract
     ----------
     backend:
         One of ``"matplotlib"``, ``"pyvista"``, or ``"vispy"``.
-        A :class:`~warpPlot.Backend` enum value is also accepted (it
+        A :class:`~warpSPHPlotting.Backend` enum value is also accepted (it
         compares equal to its string value because the enum inherits ``str``).
     backendOptions:
         Forwarded verbatim to the backend; currently unused by the factory
@@ -63,7 +63,7 @@ def get_backend(backend: str, backendOptions: Optional[dict] = None) -> Abstract
         except ImportError as exc:
             raise ImportError(
                 "The pyvista backend requires pyvista (and optionally trame).  "
-                "Install it with:  pip install 'sphWarpPlotting[plot-pyvista]'"
+                "Install it with:  pip install 'warpSPHPlotting[plot-pyvista]'"
             ) from exc
         from .pyvista_backend import PyVistaBackend  # noqa: PLC0415
         return PyVistaBackend()
@@ -74,7 +74,7 @@ def get_backend(backend: str, backendOptions: Optional[dict] = None) -> Abstract
         except ImportError as exc:
             raise ImportError(
                 "The vispy backend requires vispy (and optionally jupyter_rfb).  "
-                "Install it with:  pip install 'sphWarpPlotting[plot-vispy]'"
+                "Install it with:  pip install 'warpSPHPlotting[plot-vispy]'"
             ) from exc
         from .vispy_backend import VispyBackend  # noqa: PLC0415
         return VispyBackend()

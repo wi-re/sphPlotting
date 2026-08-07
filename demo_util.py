@@ -7,7 +7,7 @@ from diffSPH.kernels import *
 from diffSPH.neighborhood import evaluateNeighborhood, SupportScheme, computeNeighborhoodStates
 from diffSPH.enums import Operation, SupportScheme, GradientMode, LaplacianMode
 from diffSPH.operations import SPHOperation
-from sphWarpCore.util import getNextPrime, generateNeighborTestData
+from warpSPHCore.util import getNextPrime, generateNeighborTestData
 
     
 import os, sys
@@ -20,16 +20,16 @@ import warp as wp
 # Initialize Warp
 wp.init()
 
-from sphWarpCore.math import *
-from sphWarpCore.util import castTorchToWarp, castWarpToTorch, castTorchToWarpAsBuiltins
-from sphWarpCore.radiusSearch.wp_radius_small import warp_radius_search_small
-from sphWarpCore.radius import *
+from warpSPHCore.math import *
+from warpSPHCore.util import castTorchToWarp, castWarpToTorch, castTorchToWarpAsBuiltins
+from warpSPHCore.radiusSearch.wp_radius_small import warp_radius_search_small
+from warpSPHCore.radius import *
 from warp.types import vector
-from sphWarpCore.autograd import warpWrapper, WarpFunctionWrapper
-from sphWarpCore.ops import *
+from warpSPHCore.autograd import warpWrapper, WarpFunctionWrapper
+from warpSPHCore.ops import *
 import matplotlib.pyplot as plt
-from sphWarpCore.ops import sphOperation_warp
-from sphWarpCore.enumTypes import *
+from warpSPHCore.ops import sphOperation_warp
+from warpSPHCore.enumTypes import *
 import diffSPH
 from diffSPH.sampling import ParticleSet
 from diffSPH.schemes.states.common import BasicState
@@ -39,9 +39,9 @@ from diffSPH.kernels import *
 from diffSPH.neighborhood import evaluateNeighborhood, SupportScheme, computeNeighborhoodStates
 from diffSPH.enums import Operation, SupportScheme, GradientMode, LaplacianMode
 from diffSPH.operations import SPHOperation
-from sphWarpCore.ops import sphOperation_warp
-from sphWarpCore.enumTypes import *
-# from sphWarpCore.sph import computeSPHCovariance_warpBackend
+from warpSPHCore.ops import sphOperation_warp
+from warpSPHCore.enumTypes import *
+# from warpSPHCore.sph import computeSPHCovariance_warpBackend
 from diffSPH.math import pinv2x2
 from diffSPH.modules.renorm import computeCovarianceMatrices
 from diffSPH.operations import KernelCorrectionScheme
@@ -85,7 +85,7 @@ def timeFunction(func, *args, **kwargs):
 # wp.config.verify_autograd_array_access = True
 # wp.config.verbose = True
 
-from sphWarpCore import *
+from warpSPHCore import *
 
 def prepData(
     nx, targetNumNeighbors, dim, device, periodic = False, warpOnly = False, noiseAmplitude = 0.1

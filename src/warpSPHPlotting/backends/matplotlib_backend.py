@@ -5,7 +5,7 @@ that the rest of the library can treat matplotlib as just one of several
 interchangeable backends.
 
 No new rendering logic lives here — all heavy lifting stays in
-:mod:`warpPlot.visualize` and :mod:`warpPlot.update`.  The late imports
+:mod:`warpSPHPlotting.visualize` and :mod:`warpSPHPlotting.update`.  The late imports
 inside each method prevent circular-import issues while keeping this module
 importable even if matplotlib is not installed (the error surfaces only when
 a method is actually called).
@@ -41,7 +41,7 @@ class MatplotlibBackend(AbstractBackend):
         except ImportError as exc:
             raise ImportError(
                 "The matplotlib backend requires matplotlib.  "
-                "Install it with:  pip install 'sphWarpPlotting[plot-matplotlib]'"
+                "Install it with:  pip install 'warpSPHPlotting[plot-matplotlib]'"
             ) from exc
 
         opts = backendOptions or {}
